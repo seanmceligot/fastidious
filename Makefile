@@ -20,7 +20,7 @@ t_mkdir:
 errs: err_no_command err_notset er_invalid_command err_novar err_noval err_t_deny
 
 err_no_command: 
-	$(dryrun) -- x lls -l || true
+	$(dryrun) x lls -l || true
 err_notset:
 	$(dryrun) --active v no_value fake_value t template/test.config template/out.config||true
 er_invalid_command:

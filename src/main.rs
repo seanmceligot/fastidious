@@ -18,6 +18,7 @@ extern crate thiserror;
 extern crate which;
 
 use ansi_term::Colour::{Green, Red, Yellow};
+use cmd::execute_script;
 use seahorse::{Flag, FlagType};
 //use failure::Error;
 use std::{collections::HashMap, env, io::{self, Write}, path::{Path, PathBuf}, process::Command};
@@ -34,22 +35,20 @@ mod cmd;
 mod template;
 mod userinput;
 mod diff;
+mod apply;
+
+use apply::execute_apply;
 
 #[test]
 fn test_appply() -> Result<(), ApplyError> {
-    let apply_script = Script::InMemory(String::from("touch test1.tmp"));
-    let is_applied = Script::InMemory(String::from("test -f test1.tmp"));
+    let apply_script = cmd::Script::InMemory(String::from("touch test1.tmp"));
+    let is_applied = cmd::Script::InMemory(String::from("test -f test1.tmp"));
     let name = "example1";   
 
     let name_config : HashMap<String,String>  = HashMap::new(); 
     do_is_applied(name_config.clone(), &is_applied, name)?; 
     do_apply(name_config,&apply_script, name)?;    
     Ok(())    
-}
-
-enum Script {
-    FsPath(PathBuf),
-    InMemory(String)
 }
 
 fn main1() -> Result<(), ApplyError> {
@@ -116,9 +115,9 @@ fn apply_action(c: &seahorse::Context) {
     let conf = configfile::load_config(c1).unwrap();
 
     let name_config: HashMap<String, String> = configfile::scriptlet_config(conf, name).expect("scriptlet_config");
-    let is_applied_script = Script::FsPath(configfile::find_scriptlet(conf, name, "is-applied"));
+    let is_applied_script = cmd::Script::FsPath(configfile::find_scriptlet(conf, name, "is-applied"));
     do_is_applied(name_config.clone(), &is_applied_script, name).unwrap();    
-    let apply_script = Script::FsPath(configfile::find_scriptlet(conf, name, "apply"));
+    let apply_script = cmd::Script::FsPath(configfile::find_scriptlet(conf, name, "apply"));
     do_apply(name_config, &apply_script, name).unwrap();    
 
 }
@@ -131,94 +130,24 @@ fn is_applied_action(c: &seahorse::Context) {
     let conf = configfile::load_config(c1).unwrap();
     let name_config: HashMap<String, String> = configfile::scriptlet_config(conf, name).expect("scriptlet_config");
 
-    let is_applied_script = Script::FsPath(configfile::find_scriptlet(conf, name, "is-applied"));
+    let is_applied_script = cmd::Script::FsPath(configfile::find_scriptlet(conf, name, "is-applied"));
 
     do_is_applied(name_config, &is_applied_script, name).unwrap();
 }
 
-fn do_apply(name_config: HashMap<String,String>, script_path: &Script, name: &str) -> Result<(), ApplyError> {
+fn do_apply(name_config: HashMap<String,String>, script_path: &cmd::Script, name: &str) -> Result<(), ApplyError> {
     
     debug!("params {:#?}", name_config);
     execute_apply(name, script_path, name_config);
     Ok(())
 }
 
-fn do_is_applied(name_config: HashMap<String,String>, script_path: &Script, name: &str) -> Result<(), ApplyError> {
+fn do_is_applied(name_config: HashMap<String,String>, script_path: &cmd::Script, name: &str) -> Result<(), ApplyError> {
     debug!("params {:#?}", name_config);
-    is_applied(name, &script_path, name_config);
+    apply::is_applied(name, &script_path, name_config);
     Ok(())
 }
 
-fn execute_script_file(cmdpath: &Path,  vars: HashMap<String, String>) -> Result<(), ApplyError> {
-    let cmdstr = cmdpath.as_os_str();
-    debug!("run: {:#?}", cmdstr);
-    let output = Command::new("bash")
-        .arg(cmdstr)
-        .envs(vars)
-        .output()
-        .expect("cmd failed");
-    io::stdout()
-        .write_all(&output.stdout)
-        .expect("error writing to stdout");
-    match output.status.code() {
-        Some(n) => {
-            if n == 0 {
-                println!(
-                    "{} {}",
-                    Green.paint("status code: "),
-                    Green.paint(n.to_string())
-                );
-                Ok(())
-            } else {
-                println!(
-                    "{} {}",
-                    Red.paint("status code: "),
-                    Red.paint(n.to_string())
-                );
-                Err(ApplyError::NotZeroExit(n))
-            }
-        }
-        None => Err(ApplyError::CmdExitedPrematurely),
-    }
-
-}
-fn execute_script(script: &Script,  vars: HashMap<String, String>) -> Result<(), ApplyError> {
-    match script {
-        Script::FsPath(path) => execute_script_file(path,vars),
-        Script::InMemory(source) => {
-            let mut t = tempfile::NamedTempFile::new().unwrap();
-            t.write(source.as_bytes()).unwrap();
-            debug!("execute {:?}", t.path());
-            let r = execute_script_file(t.path(), vars);
-            t.close().unwrap();
-            r
-        }
-    }
-}
-fn execute_apply(_name: &str, script: &Script, vars: HashMap<String, String>) -> bool {
-    match execute_script(script, vars) {
-        Ok(_) => {
-            println!("{}", Green.paint("Applied"));
-            true
-        }
-        Err(_e) => {
-            println!("{}", Yellow.paint("Apply Failed"));
-            false
-        }
-    }
-}
-fn is_applied(_name: &str, script: &Script, vars: HashMap<String, String>) -> bool {
-    match execute_script(script, vars) {
-        Ok(_) => {
-            println!("{}", Green.paint("Applied"));
-            true
-        }
-        Err(_e) => {
-            println!("{}", Yellow.paint("Unapplied"));
-            false
-        }
-    }
-}
 
 fn main() {
     let code = match main1() {
