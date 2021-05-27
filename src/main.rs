@@ -18,6 +18,7 @@ extern crate thiserror;
 extern crate which;
 
 use ansi_term::Colour::{Green, Red, Yellow};
+use seahorse::{Flag, FlagType};
 //use failure::Error;
 use std::{collections::HashMap, env, io::{self, Write}, path::{Path, PathBuf}, process::Command};
 mod applyerr;
@@ -55,11 +56,15 @@ fn main1() -> Result<(), ApplyError> {
     dotenv::dotenv().ok();
     env_logger::init();
     let args: Vec<String> = env::args().collect();
+
     let dry_command = seahorse::Command::new("dry")
     .description("dry [name] if not already applied")
     .alias("d")
     .usage("dry(d) [name...]")
-    .action(dry_action);
+    .action(dry_action)
+    .flag(Flag::new("active", FlagType::Bool).alias("A"))
+    .flag(Flag::new("interactive", FlagType::Bool).alias("I"))
+    ;
 
     let apply_command = seahorse::Command::new("apply")
     .description("apply [name] if not already applied")
@@ -77,20 +82,30 @@ fn main1() -> Result<(), ApplyError> {
     .description(env!("CARGO_PKG_DESCRIPTION"))
     .author(env!("CARGO_PKG_AUTHORS"))
     .version(env!("CARGO_PKG_VERSION"))
-    .usage("applied action name")
-    .action(apply_action)
     .command(apply_command)
-    .command(is_applied_command);
-
+    .command(is_applied_command)
+    .command(dry_command)
+    ;
+ 
     app.run(args);
     
   
     Ok(())
 }
 fn dry_action(c: &seahorse::Context) {
-    println!("dry_action");
+    debug!("dry_action");
     let name: &str = c.args.first().unwrap();
     debug!("dry_action {}", name);
+
+    let mut mode = files::Mode::Passive;
+    if c.bool_flag("active") {
+        mode = files::Mode::Active;
+    }
+    if c.bool_flag("interactive") {
+        mode = files::Mode::Interactive;
+    }
+    
+    dryrun::dryrun(c.args.iter(), mode);
 }
 fn apply_action(c: &seahorse::Context) {
     println!("apply_action");

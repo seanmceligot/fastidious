@@ -1,7 +1,7 @@
 
-dryrun_local=cargo run --bin dryrun --
-dryrun_local=RUST_BACKTRACE=full cargo run --bin dryrun -- --debug
-dryrun_installed=dryrun
+dryrun_local=cargo run -- dry
+#dryrun_local=RUST_BACKTRACE=full cargo run --bin dryrun -- --debug
+dryrun_installed=noname dry
 dryrun=${dryrun_local}
 default: test
 
@@ -106,8 +106,3 @@ d:
 
 interactive: interactive x_interactive
 tests: passive active x x_active active_env xvar cmd 
-a:
-	cargo run -- apply example1 
-
-i:
-	cargo run -- is-applied example1 

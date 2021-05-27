@@ -269,61 +269,11 @@ fn expect_option<R>(a: Option<R>, emsg: &str) -> Result<R, DryRunError> {
         }
     }
 }
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let program = args[0].clone();
 
-    let mut opts = Options::new();
-    opts.optflag("D", "debug", "debug logging");
-    opts.optflag("i", "interactive", "ask before overwrite");
-    opts.optflag("a", "active", "overwrite without asking");
-    opts.optflag("h", "help", "print this help menu");
-    let matches = opts.parse(&args[1..]).unwrap();
-
-    if matches.opt_present("h") {
-        print_usage(&program, opts);
-        return;
-    }
-    if matches.opt_present("debug") {
-        SimpleLogger::new()
-            .with_level(LevelFilter::Trace)
-            .init()
-            .expect("log inti error");
-    } else {
-        SimpleLogger::new()
-            .with_level(LevelFilter::Warn)
-            .init()
-            .expect("log inti error");
-    }
-    let dryrun_active_env = env::var("DRYRUN_ACTIVE").is_ok();
-    if dryrun_active_env {
-        debug!(
-            "DRYRUN_ACTIVE enabled DRYRUN_ACTIVE= {:#?}",
-            env::var("DRYRUN_ACTIVE").unwrap()
-        );
-    } else {
-        debug!("DRYRUN_ACTIVE not set");
-    }
-    let mode = if matches.opt_present("interactive") {
-        Mode::Interactive
-    } else if matches.opt_present("active") | dryrun_active_env {
-        Mode::Active
-    } else {
-        Mode::Passive
-    };
-    match config::Config::default()
-        .merge(config::File::with_name("dryrun"))
-        .and_then(|cc| cc.merge(config::Environment::with_prefix("dryrun")))
-    {
-        Err(e) => println!("err {:?}", e),
-        Ok(settings) => {
-            println!("property: {:?}", settings.get::<bool>("active"));
-        }
-    };
-
+pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
+    debug!("dryrun {:?}", mode);
     let mut vars: HashMap<&str, &str> = HashMap::new();
     {
-        let mut input_list: Iter<String> = matches.free.iter();
         while let Some(input) = input_list.next() {
             let t: Type = parse_type(input);
             let mut cmd = String::new();
