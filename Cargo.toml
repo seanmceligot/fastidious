@@ -1,0 +1,28 @@
+[package]
+name = "applied"
+version = "0.1.0"
+authors = ["Sean McEligot <sean.mceligot@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+ansi_term = "*"
+seahorse = "*"
+config = "*"
+dirs = "*"
+dotenv = "*"
+env_logger = "*"
+regex = "*"
+serde = "*"
+serde_derive = "*"
+tempfile = "*"
+thiserror = "*"
+log = "*"
+#rand = "*"
+#simple_logger = "*"
+#toml = "*"
+#which = "*"
+#failure = "*"
+#getopts = "*"
+#glob = "*"
+#libc="*"
+
