@@ -1,8 +1,8 @@
 [package]
-name = "applied"
+name = "noname"
+description = "Dry Run: Print what command would be run. Only run in live or ask mode"
 version = "0.1.0"
 authors = ["Sean McEligot <sean.mceligot@gmail.com>"]
-edition = "2018"
 
 [dependencies]
 ansi_term = "*"
@@ -14,15 +14,27 @@ env_logger = "*"
 regex = "*"
 serde = "*"
 serde_derive = "*"
+getopts = "*"
+glob = "*"
 tempfile = "*"
+rand = "*"
+log = "0.4"
+simple_logger = "1.6.0"
+ansi_term = "0.12"
+which = "*"
 thiserror = "*"
-log = "*"
-#rand = "*"
-#simple_logger = "*"
-#toml = "*"
-#which = "*"
-#failure = "*"
-#getopts = "*"
-#glob = "*"
-#libc="*"
+libc="*"
+config = "*"
+
+[dev-dependencies]
+assert_cmd = "1.0.1"
+predicates = "1.0.0"
+
+[lib]
+name = "dryrun"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dryrun"
+path = "src/main.rs"
 
