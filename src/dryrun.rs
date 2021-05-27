@@ -1,32 +1,21 @@
-#![allow(unused_imports)]
-#[macro_use]
-extern crate log;
-extern crate ansi_term;
-extern crate getopts;
-extern crate glob;
-extern crate regex;
-extern crate simple_logger;
-extern crate tempfile;
-
-mod dryrun;
 
 use ansi_term::Colour::{Green, Red, Yellow};
-use dryrun::cmd::cmdline;
-use dryrun::cmd::exectable_full_path;
-use dryrun::diff::create_or_diff;
-use dryrun::diff::diff;
-use dryrun::diff::update_from_template;
-use dryrun::diff::DiffStatus;
-use dryrun::err::log_cmd_action;
-use dryrun::err::DryRunError;
-use dryrun::err::Verb;
-use dryrun::filter::generate_filtered_file;
-use dryrun::template::{generate_recommended_file, replace_line, ChangeString};
-use dryrun::userinput::ask;
-use dryrun::DestFile;
-use dryrun::GenFile;
-use dryrun::Mode;
-use dryrun::SrcFile;
+use cmd::cmdline;
+use cmd::exectable_full_path;
+use diff::create_or_diff;
+use diff::diff;
+use diff::update_from_template;
+use diff::DiffStatus;
+use dryrunerr::log_cmd_action;
+use dryrunerr::DryRunError;
+use dryrunerr::Verb;
+use filter::generate_filtered_file;
+use template::{generate_recommended_file, replace_line, ChangeString};
+use userinput::ask;
+use files::DestFile;
+use files::GenFile;
+use files::Mode;
+use files::SrcFile;
 use getopts::Options;
 use log::trace;
 use log::LevelFilter;

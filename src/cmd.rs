@@ -1,6 +1,5 @@
-extern crate which;
 
-use dryrun::err::DryRunError;
+use dryrunerr::DryRunError;
 use std::path::PathBuf;
 
 pub fn cmdline(cmd: String, args: Vec<&str>) -> String {

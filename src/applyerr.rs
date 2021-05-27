@@ -1,7 +1,6 @@
 #![allow(dead_code)]
-extern crate thiserror;
 
-use self::thiserror::Error;
+use thiserror::Error;
 use ansi_term::Colour;
 use std::fmt;
 use std::fmt::Debug;

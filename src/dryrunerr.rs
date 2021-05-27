@@ -2,7 +2,7 @@ extern crate thiserror;
 
 use self::thiserror::Error;
 use ansi_term::Colour;
-use dryrun::{DestFile, GenFile, SrcFile};
+use files::{DestFile, GenFile, SrcFile};
 use std::fmt;
 use std::fmt::Debug;
 use std::path::Path;

@@ -106,3 +106,8 @@ d:
 
 interactive: interactive x_interactive
 tests: passive active x x_active active_env xvar cmd 
+a:
+	cargo run -- apply example1 
+
+i:
+	cargo run -- is-applied example1 

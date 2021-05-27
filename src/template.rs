@@ -1,15 +1,14 @@
-extern crate tempfile;
-use dryrun::err::DryRunError;
-use dryrun::{GenFile, SrcFile};
+use dryrunerr::DryRunError;
+use files::{GenFile, SrcFile};
 use log::trace;
-use regex::Match;
-use regex::Regex;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::Error;
 use std::ops::Range;
+use regex::Regex;
+use regex::Match;
 
 #[test]
 fn test_regex() {

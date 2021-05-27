@@ -1,15 +1,21 @@
 #![allow(unused_imports)]
-#[macro_use]
-extern crate log;
-extern crate dotenv;
-//extern crate env_logger;
-extern crate seahorse;
-//#[macro_use]
+extern crate ansi_term;
 extern crate config;
 extern crate dirs;
+extern crate dotenv;
+extern crate env_logger;
+extern crate getopts;
+extern crate glob;
+#[macro_use]
+extern crate log;
+extern crate regex;
+extern crate seahorse;
 extern crate serde_derive;
-//extern crate toml;
+extern crate simple_logger;
 extern crate tempfile;
+extern crate thiserror;
+//extern crate toml;
+extern crate which;
 
 use ansi_term::Colour::{Green, Red, Yellow};
 //use failure::Error;
@@ -18,6 +24,15 @@ mod applyerr;
 use applyerr::ApplyError;
 ///mod action;
 mod configfile;
+mod dryrun;
+mod dryrunerr;
+mod files;
+mod filter;
+mod fs;
+mod cmd;
+mod template;
+mod userinput;
+mod diff;
 
 #[test]
 fn test_appply() -> Result<(), ApplyError> {
@@ -40,6 +55,11 @@ fn main1() -> Result<(), ApplyError> {
     dotenv::dotenv().ok();
     env_logger::init();
     let args: Vec<String> = env::args().collect();
+    let dry_command = seahorse::Command::new("dry")
+    .description("dry [name] if not already applied")
+    .alias("d")
+    .usage("dry(d) [name...]")
+    .action(dry_action);
 
     let apply_command = seahorse::Command::new("apply")
     .description("apply [name] if not already applied")
@@ -66,6 +86,11 @@ fn main1() -> Result<(), ApplyError> {
     
   
     Ok(())
+}
+fn dry_action(c: &seahorse::Context) {
+    println!("dry_action");
+    let name: &str = c.args.first().unwrap();
+    debug!("dry_action {}", name);
 }
 fn apply_action(c: &seahorse::Context) {
     println!("apply_action");

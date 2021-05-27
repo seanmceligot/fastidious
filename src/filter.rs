@@ -1,7 +1,7 @@
 extern crate tempfile;
-use dryrun::cmd::exectable_full_path;
-use dryrun::err::DryRunError;
-use dryrun::{GenFile, SrcFile};
+use cmd::exectable_full_path;
+use dryrunerr::DryRunError;
+use files::{GenFile, SrcFile};
 use std::collections::HashMap;
 use std::io;
 use std::process::Command;
@@ -10,15 +10,15 @@ use std::process::Stdio;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dryrun::diff::create_or_diff;
-    use dryrun::diff::DiffStatus;
-    use dryrun::{DestFile, GenFile, Mode, SrcFile};
+    use diff::create_or_diff;
+    use diff::DiffStatus;
+    use files::{DestFile, GenFile, Mode, SrcFile};
     use std::path::PathBuf;
 
     #[test]
     fn test_filter() {
-        let vars: HashMap<&str, &str> = HashMap::new();
-        let src = SrcFile::new(PathBuf::from("Cargo.toml"));
+        let _vars: HashMap<&str, &str> = HashMap::new();
+        let _src = SrcFile::new(PathBuf::from("Cargo.toml"));
         //let dest = DestFile::new(Mode::Active, PathBuf::from("./UPCASE.toml"));
         //let args = vec![&String::from("a-Z"),&String::from("A-Z")];
         //let _gen = generate_filtered_file(&vars, &src, String::from("tr"), args ).expect("generate_filtered_file");

@@ -1,9 +1,9 @@
 extern crate libc;
-use dryrun::userinput::ask;
+use userinput::ask;
 use std::path::Path;
 //use std::path::PathBuf;
-use dryrun::err::{log_path_action, DryRunError, Verb::SKIPPED};
-use dryrun::Mode;
+use dryrunerr::{log_path_action, DryRunError, Verb::SKIPPED};
+use files::Mode;
 use std::ffi::CString;
 
 //#[cfg(not(test))]

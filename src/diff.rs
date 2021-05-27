@@ -1,16 +1,14 @@
-#![allow(unused_imports)]
-extern crate tempfile;
 use ansi_term::Colour::{Red, Yellow};
-use dryrun::cmd::exectable_full_path;
-use dryrun::err::log_template_action;
-use dryrun::err::DryRunError;
-use dryrun::err::Verb::{LIVE, SKIPPED, WOULD};
-use dryrun::fs::can_create_dir_maybe;
-use dryrun::fs::can_write_file;
-use dryrun::fs::create_dir_maybe;
-use dryrun::userinput::ask;
-use dryrun::Mode;
-use dryrun::{DestFile, GenFile, SrcFile};
+use cmd::exectable_full_path;
+use dryrunerr::log_template_action;
+use dryrunerr::DryRunError;
+use dryrunerr::Verb::{LIVE, SKIPPED, WOULD};
+use fs::can_create_dir_maybe;
+use fs::can_write_file;
+use fs::create_dir_maybe;
+use userinput::ask;
+use files::Mode;
+use files::{DestFile, GenFile, SrcFile};
 use log::debug;
 use log::trace;
 use std::path::Path;
@@ -106,7 +104,7 @@ pub fn update_from_template<'f>(
     }
 }
 fn create_passive(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(), DryRunError> {
-    match can_create_dir_maybe(dest.path.parent()) {
+    match can_create_dir_maybe(dest.path().parent()) {
         Err(_e) => Err(DryRunError::InsufficientPrivileges(dest.to_string())),
         Ok(_) => {
             log_template_action("create from template", WOULD, template, gen, dest);
@@ -115,7 +113,7 @@ fn create_passive(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<
     }
 }
 fn copy_active(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(), DryRunError> {
-    match create_dir_maybe(Mode::Active, dest.path.parent()) {
+    match create_dir_maybe(Mode::Active, dest.path().parent()) {
         Err(DryRunError::PathNotFound0) => {
             Err(DryRunError::InsufficientPrivileges(dest.to_string()))
         }

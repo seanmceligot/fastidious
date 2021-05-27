@@ -6,8 +6,8 @@ use std::{collections::HashMap, path::{PathBuf}};
 use crate::applyerr::ApplyError;
 
 pub (crate) fn load_config(c1: &mut Config) -> Result<&mut Config, config::ConfigError> {
-    let c2 = c1.merge(config::Environment::with_prefix("APPLY"))?;
-    let c3 = c2.merge(config::File::with_name("apply").required(false));
+    let c2 = c1.merge(config::Environment::with_prefix("NONAME"))?;
+    let c3 = c2.merge(config::File::with_name("noname").required(false));
     c3
 }
 
