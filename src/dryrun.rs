@@ -28,11 +28,8 @@ use std::process::Command;
 use std::slice::Iter;
 use std::str;
 
-fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options]", program);
-    println!("{}", opts.usage(&brief));
-    println!("COMMANDS");
-    println!();
+pub(crate) fn print_usage(program: &str) {
+    println!("{}", program);
     println!("v key value            set template variable ");
     println!("t infile outfile       copy infile to outfile replacing @@key@@ with value  ");
     println!("x command arg1 arg2    run command  ");
