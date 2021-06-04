@@ -17,7 +17,7 @@ fix:
 	cargo fix
 
 t_mkdir:
-	$(dryrun) t dryrun.sh /tmp/deleteme
+	$(dryrun) --active t <(echo foo) /tmp/foo/deleteme
 
 errs: err_no_command err_notset er_invalid_command err_novar err_noval err_t_deny
 
@@ -32,7 +32,7 @@ err_novar:
 err_noval:
 	${dryrun} v x||true
 err_t_deny_mkdir:
-	$(dryrun) t dryrun.sh /root/foo/deleteme || true
+	$(dryrun) t <(echo foo) /root/foo/deleteme || true
 
 f:
 	$(dryrun) v key1 val1 f template/test.config template/upper.out /usr/bin/tr 'a-z' 'A-Z'
