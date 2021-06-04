@@ -16,6 +16,9 @@ pub enum DryRunError {
     #[error("Warnings")]
     Warn,
 
+    #[error("file read error: {0} {1}")]
+    FileReadError(String, String),
+
     #[error("Variable not found {0}")]
     VarNotFound(String),
 

@@ -74,9 +74,10 @@ pub fn generate_recommended_file<'a, 'b>(
     template: &'b SrcFile,
 ) -> Result<GenFile, DryRunError> {
     let gen = GenFile::new();
-    let infile: Result<File, Error> = template.open();
-    //let re = Regex::new(r"^(?P<k>[[:alnum:]\._]*)=(?P<v>.*)").unwrap();
-    let reader = BufReader::new(infile.unwrap());
+    let maybe_infile: Result<File, Error> = template.open();
+    let infile = maybe_infile
+        .map_err(|e|DryRunError::FileReadError(e.to_string(), template.to_string()))?;
+    let reader = BufReader::new(infile);
     let mut tmpfile: &File = gen.open();
     for maybe_line in reader.lines() {
         let line: String = maybe_line.unwrap();
