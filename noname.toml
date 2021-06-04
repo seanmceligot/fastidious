@@ -1,5 +1,13 @@
 script_dir= "example"
 
-[example1]
-EXAMPLE1_DIR="."
-EXAMPLE1_VALUE="applied"
+[scripts]
+
+	[example1]
+	EXAMPLE1_DIR="."
+	EXAMPLE1_VALUE="applied"
+
+	[example2]
+	VAR="Hello World!"
+	is_applied_script="test -f example2.tmp"
+	applied_script="echo ${VAR} > example2.tmp"
+	unapply_script="rm -vf example2.tmp"

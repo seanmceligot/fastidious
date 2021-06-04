@@ -5,6 +5,8 @@ dryrun_installed=noname dry
 dryrun=${dryrun_local}
 default: test
 
+a2: 
+	cargo run -- apply --iscript 'test -f foo' --ascript 'touch foo'
 a:
 	cargo run -- apply example1 
 

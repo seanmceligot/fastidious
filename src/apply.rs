@@ -7,7 +7,7 @@ use applyerr::ApplyError;
 
 use crate::cmd;
 
-pub(crate) fn execute_apply(_name: &str, script: &cmd::Script, vars: HashMap<String, String>) -> bool {
+pub(crate) fn execute_apply(script: &cmd::Script, vars: HashMap<String, String>) -> bool {
     match cmd::execute_script(script, vars) {
         Ok(_) => {
             println!("{}", Green.paint("Applied"));
@@ -19,7 +19,7 @@ pub(crate) fn execute_apply(_name: &str, script: &cmd::Script, vars: HashMap<Str
         }
     }
 }
-pub(crate) fn is_applied(_name: &str, script: &cmd::Script, vars: HashMap<String, String>) -> bool {
+pub(crate) fn is_applied(script: &cmd::Script, vars: HashMap<String, String>) -> bool {
     match execute_script(script, vars) {
         Ok(_) => {
             println!("{}", Green.paint("Applied"));
