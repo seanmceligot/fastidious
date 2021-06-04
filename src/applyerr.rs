@@ -36,6 +36,8 @@ pub enum ApplyError {
     #[error("Insufficient Privileges {0}")]
     InsufficientPrivileges(String),
 
+    #[error("Error in config {0}")]
+    ConfigError(String),
     // #[error("Path not found {0}")]
     // PathNotFound(String),
     #[error("Path not found")]

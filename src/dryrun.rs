@@ -98,6 +98,7 @@ fn process_filter_file<'t>(
     let gen = generate_filtered_file(vars, template, cmd, args)?;
     create_or_diff(mode, template, dest, &gen)
 }
+
 fn process_template_file<'t>(
     mode: Mode,
     vars: &'t HashMap<&'_ str, &'_ str>,
@@ -107,6 +108,7 @@ fn process_template_file<'t>(
     let gen = generate_recommended_file(vars, template)?;
     create_or_diff(mode, template, dest, &gen)
 }
+
 #[test]
 fn test_execute_active() -> Result<(), DryRunError> {
     execute_active("/bin/true")?;
@@ -143,6 +145,7 @@ fn execute_inactive(raw_cmd: &str) -> Result<(), DryRunError> {
         }
     }
 }
+
 fn execute_active(cmd: &str) -> Result<(), DryRunError> {
     let parts: Vec<&str> = cmd.split(' ').collect();
     let output = Command::new(parts[0])
@@ -169,6 +172,7 @@ fn execute_active(cmd: &str) -> Result<(), DryRunError> {
         None => Err(DryRunError::CmdExitedPrematurely),
     }
 }
+
 fn execute_interactive(cmd: &str) -> Result<(), DryRunError> {
     match ask(&format!("run (y/n): {}", cmd)) {
         'n' => {
@@ -179,6 +183,7 @@ fn execute_interactive(cmd: &str) -> Result<(), DryRunError> {
         _ => execute_interactive(cmd),
     }
 }
+
 fn execute(mode: Mode, cmd: &str) -> Result<(), DryRunError> {
     match mode {
         Mode::Interactive => execute_interactive(cmd),
