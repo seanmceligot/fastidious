@@ -39,7 +39,7 @@ impl From<VirtualFile> for PathBuf {
             VirtualFile::FsPath(s) => PathBuf::from(s),
             VirtualFile::InMemory(source) => {
                 let mut t = tempfile::NamedTempFile::new().unwrap();
-                t.write(source.as_bytes()).unwrap();
+                t.write_all(source.as_bytes()).unwrap();
                 debug!("tmp template {:?}", t.path());
                 match t.keep() {
                      Ok((_file,p)) =>  PathBuf::from(p),
