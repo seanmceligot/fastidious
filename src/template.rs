@@ -28,7 +28,7 @@ fn test_regex() {
         None => panic!("expected Template"),
     }
 }
-fn match_line<'a>(line: &'a str) -> Option<(&'a str, Range<usize>)> {
+fn match_line(line: & str) -> Option<(& str, Range<usize>)> {
     let re = Regex::new(r"@@(?P<k>[A-Za-z0-9_\.-]*)@@").unwrap();
     match re.captures(line) {
         Some(cap) => {

@@ -197,7 +197,7 @@ fn try_is_applied_action(c: &seahorse::Context) -> Result<(), ApplyError> {
     };
     let is_applied_script = maybe_is_applied_script?;
     
-    do_is_applied(name_config.clone(), &is_applied_script)
+    do_is_applied(name_config, &is_applied_script)
  }
 
 fn do_apply(name_config: HashMap<String,String>, script_path: &cmd::Script) -> Result<(), ApplyError> {

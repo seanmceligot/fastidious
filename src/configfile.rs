@@ -7,17 +7,16 @@ use crate::applyerr::ApplyError;
 
 pub (crate) fn load_config(c1: &mut Config) -> Result<&mut Config, config::ConfigError> {
     let c2 = c1.merge(config::Environment::with_prefix("NONAME"))?;
-    let c3 = c2.merge(config::File::with_name("noname").required(false));
-    c3
+    c2.merge(config::File::with_name("noname").required(false))
 }
 
 fn get_script_directory(conf: &mut Config) -> PathBuf {
     let script_dir = match conf.get_str("script_dir") {
         Ok(val) => PathBuf::from(val),
-        Err(_) => dirs::home_dir().unwrap_or(std::env::current_dir().unwrap()),
+        Err(_) => dirs::home_dir().unwrap_or_else(||std::env::current_dir().unwrap()),
     };
     println!("script dir: {:?}", script_dir);
-    let script_path = PathBuf::from(script_dir);
+    let script_path = script_dir.clone();
     if !script_path.exists() {
         panic!("{:?} does not exist", script_path);
     }

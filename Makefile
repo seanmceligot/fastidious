@@ -56,7 +56,7 @@ x_active:
 
 active_env: DRYRUN_ACTIVE=1
 active_env:
-	$(dryrun) "--" x ls -l $(MAKE)
+	$(dryrun) x ls -l Makefile
 
 x_interactive:
 	$(dryrun) --active v value fake_value t template/test.config template/out.config

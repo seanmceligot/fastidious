@@ -42,7 +42,7 @@ impl From<VirtualFile> for PathBuf {
                 t.write_all(source.as_bytes()).unwrap();
                 debug!("tmp template {:?}", t.path());
                 match t.keep() {
-                     Ok((_file,p)) =>  PathBuf::from(p),
+                     Ok((_file,p)) =>  p,
                      Err(persist_error) => {
                          panic!("persist error: {}", persist_error.to_string())
                        }
@@ -316,7 +316,7 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
                             .next()
                             .expect("expected output: tp template output"),
                     );
-                    Action::Template(VirtualFile::FsPath(String::from(infile)), outfile)
+                    Action::Template(VirtualFile::FsPath(infile), outfile)
                 }
                 Type::Filter => {
                     let infile = String::from(
@@ -367,7 +367,7 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
                         if cmd.is_empty() {
                             cmd.push_str(&input.to_string());
                         } else {
-                            cmd.push_str(" ");
+                            cmd.push(' ');
                             cmd.push_str(&input.to_string());
                         }
                     }
