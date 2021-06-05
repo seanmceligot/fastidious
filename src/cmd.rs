@@ -4,6 +4,8 @@ use std::{collections::HashMap, env, io::{self, Write}, path::{Path, PathBuf}, p
 use ansi_term::Colour::{Green, Red, Yellow};
 
 use crate::applyerr::ApplyError;
+
+#[derive(Debug)]
 pub enum Script {
     FsPath(PathBuf),
     InMemory(String)
@@ -67,7 +69,7 @@ pub(crate) fn execute_script(script: &Script,  vars: HashMap<String, String>) ->
         Script::InMemory(source) => {
             let mut t = tempfile::NamedTempFile::new().unwrap();
             t.write_all(source.as_bytes()).unwrap();
-            debug!("execute {:?}", t.path());
+            debug!("execute (in memory) {:?}", t.path());
             let r = execute_script_file(t.path(), vars);
             t.close().unwrap();
             r

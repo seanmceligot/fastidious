@@ -29,9 +29,6 @@ pub(crate) fn find_scriptlet(conf: &mut Config, name: &str, action: &str) -> Pat
     debug!("dir {:?}", dir);
     let path = dir.join(filename);
     trace!("script{:?}", path);
-    if !path.exists() {
-        println!("create file {:?}", path);
-    }
     println!("apply script {:?}", path);
     path
 }

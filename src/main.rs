@@ -132,8 +132,6 @@ fn is_applied_action(c: &seahorse::Context) {
 fn try_apply_action(c: &seahorse::Context) -> Result<(), ApplyError>{
     debug!("apply_action");
     let maybe_name = c.args.first();
-    let maybe_iscript = c.string_flag("iscript");
-    let maybe_ascript = c.string_flag("ascript");
 
     let c1 = &mut config::Config::default();
     let conf = configfile::load_config(c1).map_err(|e| ApplyError::ConfigError(e.to_string()))?;
@@ -144,38 +142,55 @@ fn try_apply_action(c: &seahorse::Context) -> Result<(), ApplyError>{
     } else {
         HashMap::new()
     };
-    let maybe_is_applied_script = match maybe_iscript {
-        Ok(s) => Ok(Script::InMemory(s)),
-        Err(_e) => 
-            match maybe_name {
-                Some(name) => 
-                    Ok(cmd::Script::FsPath(configfile::find_scriptlet(conf, name, "is-applied"))),
-                None => 
-                    Err(ApplyError::VarNotFound(String::from("name or iscrpt")))
-            }
-    };
-    let is_applied_script = maybe_is_applied_script?;
+    let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, conf);    let is_applied_script = maybe_is_applied_script?;
     
     do_is_applied(name_config.clone(), &is_applied_script).unwrap();    
 
-    let maybe_apply_script = match maybe_ascript {
-        Ok(s) => Ok(Script::InMemory(s)),
-        Err(_e) => 
-            if let Some(name) = maybe_name {
-                Ok(cmd::Script::FsPath(configfile::find_scriptlet(conf, name, "apply")))
-            } else {
-                Err(ApplyError::VarNotFound(String::from("name or iscrpt")))
-            }
-    };
+
+    let maybe_apply_script = lookup_apply_script(c, maybe_name, &name_config, conf);
     let apply_script = maybe_apply_script.unwrap();
 
     do_apply(name_config, &apply_script)
 }
+
+fn lookup_is_applied_script(c: &seahorse::Context, maybe_name: Option<&String>, name_config: &HashMap<String, String>, conf: &mut config::Config) -> Result<Script, ApplyError> {
+    let script_arg_name = "iscript";
+    let script_param_name = "is_applied";
+    let script_file_name = "is-applied";
+
+    lookup_script(c, script_arg_name, maybe_name, name_config, script_param_name, conf, script_file_name)
+}
+fn lookup_apply_script(c: &seahorse::Context, maybe_name: Option<&String>, name_config: &HashMap<String, String>, conf: &mut config::Config) -> Result<Script, ApplyError> {
+    let script_arg_name = "ascript";
+    let script_param_name = "apply";
+    let script_file_name = "apply";
+ 
+    lookup_script(c, script_arg_name, maybe_name, name_config, script_param_name, conf, script_file_name)
+}
+fn lookup_script(c: &seahorse::Context, script_arg_name: &str, maybe_name: Option<&String>, name_config: &HashMap<String, String>, script_param_name: &str, conf: &mut config::Config, script_file_name: &str) -> Result<Script, ApplyError> {
+    let maybe_iscript = c.string_flag(script_arg_name);
+    debug!("maybe_iscript {:?}", maybe_iscript);
+    let maybe_is_applied_script = match maybe_iscript {
+        Ok(s) => Ok(Script::InMemory(s)),
+        Err(_e) => 
+            match maybe_name {
+                Some(name) => {
+                    // check name_config for "is_applied"
+                    match name_config.get(script_param_name) {
+                        Some(source) => Ok(cmd::Script::InMemory(source.clone())),
+                        None => Ok(cmd::Script::FsPath(configfile::find_scriptlet(conf, name, script_file_name)))
+                    }
+                },
+                None => 
+                    Err(ApplyError::VarNotFound(String::from(
+                        format!("arg --{} or config {} or file {}", script_arg_name, script_param_name, script_file_name))))
+            }
+    };
+    maybe_is_applied_script
+}
 fn try_is_applied_action(c: &seahorse::Context) -> Result<(), ApplyError> {
     println!("is_applied_action");
     let maybe_name = c.args.first();
-    let maybe_iscript = c.string_flag("iscript");
-
     let c1 = &mut config::Config::default();
     let conf = configfile::load_config(c1).map_err(|e| ApplyError::ConfigError(e.to_string()))?;
 
@@ -185,16 +200,7 @@ fn try_is_applied_action(c: &seahorse::Context) -> Result<(), ApplyError> {
     } else {
         HashMap::new()
     };
-    let maybe_is_applied_script = match maybe_iscript {
-        Ok(s) => Ok(Script::InMemory(s)),
-        Err(_e) => 
-            match maybe_name {
-                Some(name) => 
-                    Ok(cmd::Script::FsPath(configfile::find_scriptlet(conf, name, "is-applied"))),
-                None => 
-                    Err(ApplyError::VarNotFound(String::from("name or iscrpt")))
-            }
-    };
+    let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, conf);
     let is_applied_script = maybe_is_applied_script?;
     
     do_is_applied(name_config, &is_applied_script)
@@ -202,14 +208,15 @@ fn try_is_applied_action(c: &seahorse::Context) -> Result<(), ApplyError> {
 
 fn do_apply(name_config: HashMap<String,String>, script_path: &cmd::Script) -> Result<(), ApplyError> {
     
-    debug!("params {:#?}", name_config);
+    debug!("do_apply params {:#?}", name_config);
     execute_apply(script_path, name_config);
     Ok(())
 }
 
-fn do_is_applied(name_config: HashMap<String,String>, script_path: &cmd::Script) -> Result<(), ApplyError> {
-    debug!("params {:#?}", name_config);
-    apply::is_applied(&script_path, name_config);
+fn do_is_applied(name_config: HashMap<String,String>, script: &cmd::Script) -> Result<(), ApplyError> {
+    debug!("do_is_applied params {:#?}", name_config);
+    debug!("do_is_applied script {:?}", script);
+    apply::is_applied(&script, name_config);
     // TODO: return Delta >= 0
     Ok(())
 }
