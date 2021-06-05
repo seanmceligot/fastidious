@@ -66,7 +66,7 @@ pub(crate) fn execute_script(script: &Script,  vars: HashMap<String, String>) ->
         Script::FsPath(path) => execute_script_file(path,vars),
         Script::InMemory(source) => {
             let mut t = tempfile::NamedTempFile::new().unwrap();
-            t.write(source.as_bytes()).unwrap();
+            t.write_all(source.as_bytes()).unwrap();
             debug!("execute {:?}", t.path());
             let r = execute_script_file(t.path(), vars);
             t.close().unwrap();
