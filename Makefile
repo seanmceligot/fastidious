@@ -68,7 +68,7 @@ create:
 	$(MAKE) active	
 
 test:  lint
-	RUST_BACKTRACE=1 cargo test
+	RUST_BACKTRACE=1 RUST_LOG=debug cargo test --verbose
 
 help:
 	$(dryrun) --help

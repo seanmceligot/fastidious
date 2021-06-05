@@ -28,6 +28,30 @@ use std::process::Command;
 use std::slice::Iter;
 use std::str;
 
+#[derive(Debug)]
+pub enum VirtualFile {
+    FsPath(String),
+    InMemory(String)
+}
+impl From<VirtualFile> for PathBuf {
+    fn from(vf: VirtualFile) -> PathBuf {
+        match vf {
+            VirtualFile::FsPath(s) => PathBuf::from(s),
+            VirtualFile::InMemory(source) => {
+                let mut t = tempfile::NamedTempFile::new().unwrap();
+                t.write(source.as_bytes()).unwrap();
+                debug!("tmp template {:?}", t.path());
+                match t.keep() {
+                     Ok((_file,p)) =>  PathBuf::from(p),
+                     Err(persist_error) => {
+                         panic!("persist error: {}", persist_error.to_string())
+                       }
+                    }
+            }
+        }
+    }
+}
+
 pub(crate) fn print_usage(program: &str) {
     println!("{}", program);
     println!("v key value            set template variable ");
@@ -38,7 +62,7 @@ pub(crate) fn print_usage(program: &str) {
 #[derive(Debug)]
 enum Action<'a> {
     Filter(String, String, String, Vec<&'a String>),
-    Template(String, String),
+    Template(VirtualFile, String),
     Execute(String),
     Error,
     None,
@@ -254,8 +278,8 @@ fn test_do_action() {
     let mut vars: HashMap<&str, &str> = HashMap::new();
     vars.insert("value", "unit_test");
     let template = Action::Template(
-        String::from("template/test.config"),
-        String::from("template/out.config"),
+        VirtualFile::InMemory(String::from("key=@@value@@")),
+        String::from("/tmp/key_unit_test.txt"),
     );
     match do_action(Mode::Passive, &vars, template) {
         Ok(_) => {}
@@ -292,7 +316,7 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
                             .next()
                             .expect("expected output: tp template output"),
                     );
-                    Action::Template(infile, outfile)
+                    Action::Template(VirtualFile::FsPath(String::from(infile)), outfile)
                 }
                 Type::Filter => {
                     let infile = String::from(
