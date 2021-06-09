@@ -2,15 +2,15 @@
 
 use thiserror::Error;
 use ansi_term::Colour;
-use std::fmt;
+use std::{ffi::OsString, fmt};
 use std::fmt::Debug;
 use std::path::Path;
 
 #[non_exhaustive]
 #[derive(Error, Debug)]
 pub enum ApplyError {
-    #[error("Error(s)")]
-    Error,
+    #[error("Error: {0}")]
+    Error(String),
 
     #[error("Warnings")]
     Warn,
@@ -39,6 +39,9 @@ pub enum ApplyError {
     #[error("Expected argument: {0}")]
     ExpectedArg(&'static str),
 
+    #[error("Expected argument: {0}")]
+    UnExpectedArg(String),
+
     #[error("Insufficient Privileges {0}")]
     InsufficientPrivileges(String),
 
@@ -48,6 +51,12 @@ pub enum ApplyError {
     // PathNotFound(String),
     #[error("Path not found")]
     PathNotFound0,
+
+    #[error("Diff Error {0}")]
+    DiffFailed(String),
+
+    #[error("Copy Error {0} {1}")]
+    CopyError(String, String)
 }
 #[derive(Debug, Copy, Clone)]
 pub enum Verb {
@@ -61,29 +70,12 @@ impl fmt::Display for Verb {
         Debug::fmt(self, f)
     }
 }
-fn color_from_verb(verb: Verb) -> Colour {
+pub fn color_from_verb(verb: Verb) -> Colour {
     match verb {
         Verb::WOULD => Colour::Yellow,
         Verb::LIVE => Colour::Green,
         Verb::SKIPPED => Colour::Yellow,
     }
-}
-pub fn log_template_action(
-    action: &'static str,
-    verb: Verb,
-    template: &SrcFile,
-    gen: &GenFile,
-    dest: &DestFile,
-) {
-    let color: Colour = color_from_verb(verb);
-    println!(
-        "{}: {} {} [{}]  ->{}",
-        color.paint(verb.to_string()),
-        color.paint(action),
-        color.paint(template.to_string()),
-        color.paint(gen.to_string()),
-        color.paint(dest.to_string())
-    );
 }
 pub fn log_cmd_action(action: &'static str, verb: Verb, cli: String) {
     let color: Colour = color_from_verb(verb);

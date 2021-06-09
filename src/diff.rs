@@ -1,7 +1,6 @@
 use ansi_term::Colour::{Red, Yellow};
 use cmd::exectable_full_path;
-use applyerr::log_template_action;
-use applyerr::ApplyError;
+use applyerr::{ApplyError, color_from_verb};
 use applyerr::Verb::{LIVE, SKIPPED, WOULD};
 use fs::can_create_dir_maybe;
 use fs::can_write_file;
@@ -16,6 +15,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::ExitStatus;
 use std::vec::IntoIter;
+use ansi_term::Colour;
+use crate::applyerr::Verb;
 
 #[derive(Debug)]
 pub struct DiffText<'f> {
@@ -28,6 +29,24 @@ pub enum DiffStatus {
     NewFile,
     Changed(IntoIter<u8>),
     Failed,
+}
+
+pub fn log_template_action(
+    action: &'static str,
+    verb: Verb,
+    template: &SrcFile,
+    gen: &GenFile,
+    dest: &DestFile,
+) {
+    let color: Colour = color_from_verb(verb);
+    println!(
+        "{}: {} {} [{}]  ->{}",
+        color.paint(verb.to_string()),
+        color.paint(action),
+        color.paint(template.to_string()),
+        color.paint(gen.to_string()),
+        color.paint(dest.to_string())
+    );
 }
 
 pub fn diff<'f>(path: &'f Path, path2: &'f Path) -> DiffStatus {
@@ -85,7 +104,7 @@ pub fn update_from_template<'f>(
         }
         DiffStatus::Failed => {
             debug!("diff failed '{}'", dest);
-            Err(ApplyError::Error)
+            Err(ApplyError::Error(format!("diff failed '{}'", dest)))
         }
         DiffStatus::NewFile => {
             debug!("create '{}'", dest);
@@ -127,7 +146,7 @@ fn copy_active(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(),
                         Red.paint("error: copy failed"),
                         Red.paint(e.to_string())
                     );
-                    Err(ApplyError::Error)
+                    Err(ApplyError::Error(format!("copy failed {:?} {:?}", gen.path(), dest.path())))
                 }
                 Ok(_) => Ok(()),
             }

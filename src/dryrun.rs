@@ -64,7 +64,7 @@ enum Action<'a> {
     Filter(String, String, String, Vec<&'a String>),
     Template(VirtualFile, String),
     Execute(String),
-    Error,
+    Error(String),
     None,
 }
 #[derive(Debug)]
@@ -136,10 +136,10 @@ fn test_execute_active() -> Result<(), ApplyError> {
     match execute_active("/bin/false") {
         Err(e) => println!(
             "{} {}",
-            Red.paint("Not Executable: "),
+            Red.paint("/bin/false returned: "),
             Red.paint(e.to_string())
         ),
-        _ => return Err(ApplyError::Error),
+        _ => return Err(ApplyError::Error(String::from("OK not expected"))),
     }
     execute_active("echo echo_ping")?;
     Ok(())
@@ -268,7 +268,7 @@ fn do_action<'g>(
                 }
             }
         }
-        Action::Error => Err(ApplyError::Error),
+        Action::Error(msg) => Err(ApplyError::Error(msg)),
         Action::None => Ok(()),
     }
 }
@@ -348,7 +348,7 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
                                     vars.insert(k, v);
                                     Action::None
                                 }
-                                Err(_) => Action::Error,
+                                Err(_) => Action::Error(format!("expected variable value for {}", k)),
                             }
                         }
                         Err(e) => {
@@ -357,7 +357,7 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
                                 Red.paint("error:"),
                                 Red.paint(e.to_string())
                             );
-                            Action::Error
+                            Action::Error(String::from("expected variable key"))
                         }
                     }
                 }
@@ -376,7 +376,7 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
                 }
                 Type::Unknown => {
                     println!("{} {}", Red.paint("Unknown type:"), Red.paint(input));
-                    Action::Error
+                    Action::Error(format!("Unknown type: {}", input))
                 }
             };
             //debug!("vars {:#?}", &vars);

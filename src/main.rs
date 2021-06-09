@@ -27,7 +27,6 @@ use applyerr::ApplyError;
 ///mod action;
 mod configfile;
 mod dryrun;
-mod applyerr;
 mod files;
 mod filter;
 mod fs;
