@@ -9,8 +9,14 @@ use std::path::Path;
 #[non_exhaustive]
 #[derive(Error, Debug)]
 pub enum ApplyError {
+    #[error("Error(s)")]
+    Error,
+
     #[error("Warnings")]
     Warn,
+
+    #[error("file read error: {0} {1}")]
+    FileReadError(String, String),
 
     #[error("Variable not found {0}")]
     VarNotFound(String),
@@ -61,6 +67,23 @@ fn color_from_verb(verb: Verb) -> Colour {
         Verb::LIVE => Colour::Green,
         Verb::SKIPPED => Colour::Yellow,
     }
+}
+pub fn log_template_action(
+    action: &'static str,
+    verb: Verb,
+    template: &SrcFile,
+    gen: &GenFile,
+    dest: &DestFile,
+) {
+    let color: Colour = color_from_verb(verb);
+    println!(
+        "{}: {} {} [{}]  ->{}",
+        color.paint(verb.to_string()),
+        color.paint(action),
+        color.paint(template.to_string()),
+        color.paint(gen.to_string()),
+        color.paint(dest.to_string())
+    );
 }
 pub fn log_cmd_action(action: &'static str, verb: Verb, cli: String) {
     let color: Colour = color_from_verb(verb);

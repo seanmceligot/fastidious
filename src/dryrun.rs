@@ -6,9 +6,9 @@ use diff::create_or_diff;
 use diff::diff;
 use diff::update_from_template;
 use diff::DiffStatus;
-use dryrunerr::log_cmd_action;
-use dryrunerr::DryRunError;
-use dryrunerr::Verb;
+use applyerr::log_cmd_action;
+use applyerr::ApplyError;
+use applyerr::Verb;
 use filter::generate_filtered_file;
 use template::{generate_recommended_file, replace_line, ChangeString};
 use userinput::ask;
@@ -115,7 +115,7 @@ fn process_filter_file<'t>(
     dest: &DestFile,
     cmd: String,
     args: Vec<&String>,
-) -> Result<DiffStatus, DryRunError> {
+) -> Result<DiffStatus, ApplyError> {
     let gen = generate_filtered_file(vars, template, cmd, args)?;
     create_or_diff(mode, template, dest, &gen)
 }
@@ -125,13 +125,13 @@ fn process_template_file<'t>(
     vars: &'t HashMap<&'_ str, &'_ str>,
     template: &SrcFile,
     dest: &DestFile,
-) -> Result<DiffStatus, DryRunError> {
+) -> Result<DiffStatus, ApplyError> {
     let gen = generate_recommended_file(vars, template)?;
     create_or_diff(mode, template, dest, &gen)
 }
 
 #[test]
-fn test_execute_active() -> Result<(), DryRunError> {
+fn test_execute_active() -> Result<(), ApplyError> {
     execute_active("/bin/true")?;
     match execute_active("/bin/false") {
         Err(e) => println!(
@@ -139,13 +139,13 @@ fn test_execute_active() -> Result<(), DryRunError> {
             Red.paint("Not Executable: "),
             Red.paint(e.to_string())
         ),
-        _ => return Err(DryRunError::Error),
+        _ => return Err(ApplyError::Error),
     }
     execute_active("echo echo_ping")?;
     Ok(())
 }
 
-fn execute_inactive(raw_cmd: &str) -> Result<(), DryRunError> {
+fn execute_inactive(raw_cmd: &str) -> Result<(), ApplyError> {
     let empty_vec: Vec<&str> = Vec::new();
     let v: Vec<&str> = raw_cmd.split(' ').collect();
     let (cmd, args): (&str, Vec<&str>) = match v.as_slice() {
@@ -154,7 +154,7 @@ fn execute_inactive(raw_cmd: &str) -> Result<(), DryRunError> {
         [cmd, args @ ..] => (cmd, args.to_vec()),
     };
     match cmd {
-        "" => Err(DryRunError::ExpectedArg("x command")),
+        "" => Err(ApplyError::ExpectedArg("x command")),
         _ => {
             trace!("{}", cmd);
             let exe_path = exectable_full_path(cmd)?;
@@ -167,7 +167,7 @@ fn execute_inactive(raw_cmd: &str) -> Result<(), DryRunError> {
     }
 }
 
-fn execute_active(cmd: &str) -> Result<(), DryRunError> {
+fn execute_active(cmd: &str) -> Result<(), ApplyError> {
     let parts: Vec<&str> = cmd.split(' ').collect();
     let output = Command::new(parts[0])
         .args(&parts[1..])
@@ -187,14 +187,14 @@ fn execute_active(cmd: &str) -> Result<(), DryRunError> {
                 );
                 Ok(())
             } else {
-                Err(DryRunError::NotZeroExit(n))
+                Err(ApplyError::NotZeroExit(n))
             }
         }
-        None => Err(DryRunError::CmdExitedPrematurely),
+        None => Err(ApplyError::CmdExitedPrematurely),
     }
 }
 
-fn execute_interactive(cmd: &str) -> Result<(), DryRunError> {
+fn execute_interactive(cmd: &str) -> Result<(), ApplyError> {
     match ask(&format!("run (y/n): {}", cmd)) {
         'n' => {
             println!("{} {}", Yellow.paint("WOULD: run "), Yellow.paint(cmd));
@@ -205,7 +205,7 @@ fn execute_interactive(cmd: &str) -> Result<(), DryRunError> {
     }
 }
 
-fn execute(mode: Mode, cmd: &str) -> Result<(), DryRunError> {
+fn execute(mode: Mode, cmd: &str) -> Result<(), ApplyError> {
     match mode {
         Mode::Interactive => execute_interactive(cmd),
         Mode::Passive => execute_inactive(cmd).map(|_pathbuf| ()),
@@ -217,7 +217,7 @@ fn do_action<'g>(
     mode: Mode,
     vars: &'g HashMap<&'g str, &'g str>,
     action: Action,
-) -> Result<(), DryRunError> {
+) -> Result<(), ApplyError> {
     match action {
         Action::Filter(intput_file_name, output_file_name, cmd, args) => {
             let intput_file = SrcFile::new(PathBuf::from(intput_file_name));
@@ -268,7 +268,7 @@ fn do_action<'g>(
                 }
             }
         }
-        Action::Error => Err(DryRunError::Error),
+        Action::Error => Err(ApplyError::Error),
         Action::None => Ok(()),
     }
 }
@@ -286,12 +286,12 @@ fn test_do_action() {
         Err(_) => std::process::exit(1),
     }
 }
-fn expect_option<R>(a: Option<R>, emsg: &str) -> Result<R, DryRunError> {
+fn expect_option<R>(a: Option<R>, emsg: &str) -> Result<R, ApplyError> {
     match a {
         Some(r) => Ok(r),
         None => {
             println!("{}", Red.paint(emsg));
-            Err(DryRunError::Warn)
+            Err(ApplyError::Warn)
         }
     }
 }

@@ -2,7 +2,7 @@ extern crate libc;
 use userinput::ask;
 use std::path::Path;
 //use std::path::PathBuf;
-use dryrunerr::{log_path_action, DryRunError, Verb::SKIPPED};
+use applyerr::{log_path_action, ApplyError, Verb::SKIPPED};
 use files::Mode;
 use std::ffi::CString;
 
@@ -26,7 +26,7 @@ fn test_can() {
     assert_eq!(can_create_dir(Path::new(".")).is_ok(), true);
 }
 
-//pub fn assert_nonempty_path(path: &Path) -> Result<(), DryRunError> { match path { None => Err(DryRunError::PathEmpty), _ => Ok(()) } }
+//pub fn assert_nonempty_path(path: &Path) -> Result<(), ApplyError> { match path { None => Err(ApplyError::PathEmpty), _ => Ok(()) } }
 
 fn access_w(path: &Path) -> bool {
     let cstr = CString::new(path.display().to_string()).unwrap();
@@ -40,13 +40,13 @@ fn access_x(path: &Path) -> bool {
         matches!(libc::faccessat(libc::AT_FDCWD, cstr.as_ptr(), libc::X_OK, libc::AT_EACCESS) as isize, 0)
     }
 }
-pub fn can_write_file(path: &Path) -> Result<&Path, DryRunError> {
+pub fn can_write_file(path: &Path) -> Result<&Path, ApplyError> {
     trace!("can_write_file{:?}", path);
     if path.exists() {
         if access_w(path) {
             Ok(path)
         } else {
-            Err(DryRunError::InsufficientPrivileges(
+            Err(ApplyError::InsufficientPrivileges(
                 path.display().to_string(),
             ))
         }
@@ -54,21 +54,21 @@ pub fn can_write_file(path: &Path) -> Result<&Path, DryRunError> {
         can_write_dir_maybe(path.parent())
     }
 }
-pub fn can_write_dir_maybe(maybe_dir: Option<&Path>) -> Result<&Path, DryRunError> {
+pub fn can_write_dir_maybe(maybe_dir: Option<&Path>) -> Result<&Path, ApplyError> {
     trace!("can_write_dir_maybe {:?}", maybe_dir);
     match maybe_dir {
         Some(dir) => can_write_dir(dir),
-        None => Err(DryRunError::PathNotFound0),
+        None => Err(ApplyError::PathNotFound0),
     }
 }
-pub fn can_write_dir(dir: &Path) -> Result<&Path, DryRunError> {
+pub fn can_write_dir(dir: &Path) -> Result<&Path, ApplyError> {
     trace!("can_write_dir{:?}", dir);
     if dir.file_name().is_none() {
         let pwd = Path::new(".");
         if access_w(pwd) {
             Ok(pwd)
         } else {
-            Err(DryRunError::InsufficientPrivileges(
+            Err(ApplyError::InsufficientPrivileges(
                 pwd.display().to_string(),
             ))
         }
@@ -76,7 +76,7 @@ pub fn can_write_dir(dir: &Path) -> Result<&Path, DryRunError> {
         if access_w(dir) {
             Ok(dir)
         } else {
-            Err(DryRunError::InsufficientPrivileges(
+            Err(ApplyError::InsufficientPrivileges(
                 dir.display().to_string(),
             ))
         }
@@ -84,20 +84,20 @@ pub fn can_write_dir(dir: &Path) -> Result<&Path, DryRunError> {
         can_create_dir_maybe(dir.parent())
     }
 }
-pub fn can_create_dir_maybe(maybe_dir: Option<&Path>) -> Result<&Path, DryRunError> {
+pub fn can_create_dir_maybe(maybe_dir: Option<&Path>) -> Result<&Path, ApplyError> {
     trace!("can_create_dir_maybe {:?}", maybe_dir);
     match maybe_dir {
         Some(dir) => can_create_dir(dir),
-        None => Err(DryRunError::PathNotFound0),
+        None => Err(ApplyError::PathNotFound0),
     }
 }
-pub fn can_create_dir(dir: &Path) -> Result<&Path, DryRunError> {
+pub fn can_create_dir(dir: &Path) -> Result<&Path, ApplyError> {
     trace!("can_create_dir{:?}", dir);
     if dir.exists() {
         if access_x(dir) {
             Ok(dir)
         } else {
-            Err(DryRunError::InsufficientPrivileges(
+            Err(ApplyError::InsufficientPrivileges(
                 dir.display().to_string(),
             ))
         }
@@ -105,14 +105,14 @@ pub fn can_create_dir(dir: &Path) -> Result<&Path, DryRunError> {
         can_create_dir_maybe(dir.parent())
     }
 }
-pub fn create_dir_maybe(mode: Mode, maybe_dir: Option<&Path>) -> Result<&Path, DryRunError> {
+pub fn create_dir_maybe(mode: Mode, maybe_dir: Option<&Path>) -> Result<&Path, ApplyError> {
     trace!("create_dir_maybe {:?}", maybe_dir);
     match maybe_dir {
         Some(dir) => create_dir(mode, dir),
-        None => Err(DryRunError::PathNotFound0),
+        None => Err(ApplyError::PathNotFound0),
     }
 }
-pub fn create_dir(mode: Mode, dir: &Path) -> Result<&Path, DryRunError> {
+pub fn create_dir(mode: Mode, dir: &Path) -> Result<&Path, ApplyError> {
     trace!("create_dir{:?}", dir);
     if dir.exists() {
         Ok(dir)
@@ -133,7 +133,7 @@ pub fn create_dir(mode: Mode, dir: &Path) -> Result<&Path, DryRunError> {
             'y' => {
                 println!("mkdir {}", dir.display());
                 match std::fs::create_dir_all(dir) {
-                    Err(e) => Err(DryRunError::IoError(e)),
+                    Err(e) => Err(ApplyError::IoError(e)),
                     Ok(_) => Ok(dir),
                 }
             }

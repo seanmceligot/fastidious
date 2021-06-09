@@ -1,6 +1,6 @@
 extern crate tempfile;
 use cmd::exectable_full_path;
-use dryrunerr::DryRunError;
+use applyerr::ApplyError;
 use files::{GenFile, SrcFile};
 use std::collections::HashMap;
 use std::io;
@@ -30,7 +30,7 @@ pub fn generate_filtered_file<'a>(
     src: &SrcFile,
     cmd: String,
     args: Vec<&'a String>,
-) -> Result<GenFile, DryRunError> {
+) -> Result<GenFile, ApplyError> {
     let gen = GenFile::new();
     let cmdpath = exectable_full_path(&cmd)?;
     match Command::new(cmdpath)

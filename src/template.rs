@@ -1,4 +1,4 @@
-use dryrunerr::DryRunError;
+use applyerr::ApplyError;
 use files::{GenFile, SrcFile};
 use log::trace;
 use std::collections::HashMap;
@@ -44,7 +44,7 @@ pub enum ChangeString {
     Changed(String),
     Unchanged,
 }
-pub fn replace_line(vars: &HashMap<&str, &str>, line: String) -> Result<ChangeString, DryRunError> {
+pub fn replace_line(vars: &HashMap<&str, &str>, line: String) -> Result<ChangeString, ApplyError> {
     match match_line(line.as_str()) {
         Some((key, range)) => {
             let mut new_line: String = String::new();
@@ -62,7 +62,7 @@ pub fn replace_line(vars: &HashMap<&str, &str>, line: String) -> Result<ChangeSt
                 new_line.push('\n');
                 Ok(ChangeString::Changed(new_line))
             } else {
-                Err(DryRunError::VarNotFound(String::from(key)))
+                Err(ApplyError::VarNotFound(String::from(key)))
             }
         }
         None => Ok(ChangeString::Unchanged),
@@ -72,11 +72,11 @@ pub fn replace_line(vars: &HashMap<&str, &str>, line: String) -> Result<ChangeSt
 pub fn generate_recommended_file<'a, 'b>(
     vars: &'a HashMap<&str, &str>,
     template: &'b SrcFile,
-) -> Result<GenFile, DryRunError> {
+) -> Result<GenFile, ApplyError> {
     let gen = GenFile::new();
     let maybe_infile: Result<File, Error> = template.open();
     let infile = maybe_infile
-        .map_err(|e|DryRunError::FileReadError(e.to_string(), template.to_string()))?;
+        .map_err(|e|ApplyError::FileReadError(e.to_string(), template.to_string()))?;
     let reader = BufReader::new(infile);
     let mut tmpfile: &File = gen.open();
     for maybe_line in reader.lines() {
