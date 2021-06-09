@@ -1,6 +1,7 @@
 
-use std::{collections::HashMap, env, io::{self, Write}, path::{Path, PathBuf}, process::Command};
+use std::{collections::HashMap, env, fs::{File, OpenOptions}, io::{self, Write}, path::{Path, PathBuf}, process::Command};
 use ansi_term::Colour::{Green, Red, Yellow};
+use tempfile::NamedTempFile;
 use crate::applyerr::ApplyError;
 
 #[derive(Debug)]
@@ -8,7 +9,44 @@ pub enum Script {
     FsPath(PathBuf),
     InMemory(String)
 }
+impl Script {
+    fn open_readonly(&self) -> Result<OpenFileHolder,ApplyError> {
+        match (self) {
+            Script::FsPath(path) => {
+                let maybe_file =OpenOptions::new().read(true).open(path);
+                let f = maybe_file.map_err(|e| 
+                    ApplyError::FileReadError(format!("read error {:?} {:?}", path, e)))?;
+                Ok(OpenFileHolder::Perm(f, path.to_path_buf()))
+            },
+            Script::InMemory(source) => {
+                let mut t = tempfile::NamedTempFile::new().unwrap();
+                debug!("contents: {}", source);
+                t.write_all(source.as_bytes()).
+                    map_err(|e|ApplyError::FileWriteError(format!("{:?} {:?}", t.path(), e)))?;
+                Ok(OpenFileHolder::Temp(t))
+            }
+        }
+    }
+}
+enum OpenFileHolder {
+    Temp(NamedTempFile),
+    Perm(File, PathBuf) 
+}
+impl OpenFileHolder {
+    fn file(&self) -> &File {
+        match self {
+            OpenFileHolder::Temp(named) => named.as_file(),
+            OpenFileHolder::Perm(f, _p) => f
+        }
+    }
+    fn path(&self) -> &Path {
+        match self {
+            OpenFileHolder::Temp(named) => named.path(),
+            OpenFileHolder::Perm(_f,p) => p
+        }
 
+    }
+}
 pub fn cmdline(cmd: String, args: Vec<&str>) -> String {
     let mut full = vec![cmd.as_str()];
     full.append(&mut args.to_vec());
@@ -62,15 +100,6 @@ pub(crate) fn execute_script_file(cmdpath: &Path,  vars: HashMap<String, String>
 
 }
 pub(crate) fn execute_script(script: &Script,  vars: HashMap<String, String>) -> Result<(), ApplyError> {
-    match script {
-        Script::FsPath(path) => execute_script_file(path,vars),
-        Script::InMemory(source) => {
-            let mut t = tempfile::NamedTempFile::new().unwrap();
-            t.write_all(source.as_bytes()).unwrap();
-            debug!("execute (in memory) {:?}", t.path());
-            let r = execute_script_file(t.path(), vars);
-            t.close().unwrap();
-            r
-        }
-    }
+    let script_file = script.open_readonly()?;
+    Ok(execute_script_file(script_file.path(), vars)?)
 }

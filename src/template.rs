@@ -76,7 +76,7 @@ pub fn generate_recommended_file<'a, 'b>(
     let gen = GenFile::new();
     let maybe_infile: Result<File, Error> = template.open();
     let infile = maybe_infile
-        .map_err(|e|ApplyError::FileReadError(e.to_string(), template.to_string()))?;
+        .map_err(|e|ApplyError::FileReadError(format!("{:?} {:?}", template, e)))?;
     let reader = BufReader::new(infile);
     let mut tmpfile: &File = gen.open();
     for maybe_line in reader.lines() {
