@@ -74,7 +74,7 @@ pub fn create_or_diff(
     dest: &DestFile,
     gen: &GenFile,
 ) -> Result<DiffStatus, ApplyError> {
-    debug!("create_or_diff: diff");
+    debug!("create_or_diff: diff {:?} {:?}", gen.path(), dest.path());
     diff(gen.path(), dest.path());
     match update_from_template(mode, template, gen, dest) {
         Ok(_) => Ok(diff(gen.path(), dest.path())),
@@ -174,16 +174,17 @@ fn copy_interactive(
         panic!("cp failed: {:?} -> {:?}", gen, dest)
     }
 }
-fn merge_into_template(template: &SrcFile, _gen: &GenFile, dest: &DestFile) -> bool {
+fn merge_into_template(template: &SrcFile, _gen: &GenFile, dest: &DestFile) -> Result<bool,ApplyError> {
+    let template_file = template.open()?;
     let status = Command::new("vim")
         .arg("-d")
         .arg(dest)
-        .arg(template)
+        .arg(template_file.path())
         .status()
         .expect("failed to execute process");
 
     println!("with: {}", status);
-    status.success()
+    Ok(status.success())
 }
 fn exit_status_to_dryrun_error(r: std::io::Result<ExitStatus>) -> Result<(), ApplyError> {
     match r {
@@ -242,7 +243,7 @@ fn update_from_template_interactive(
             Ok(())
         }
         't' => {
-            merge_into_template(template, gen, dest);
+            merge_into_template(template, gen, dest)?;
             Ok(())
         }
         'm' => merge_to_template_interactive(template, gen, dest).map(|_status_code| ()),

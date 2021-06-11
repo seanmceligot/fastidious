@@ -73,12 +73,12 @@ pub fn generate_recommended_file<'a, 'b>(
     vars: &'a HashMap<&str, &str>,
     template: &'b SrcFile,
 ) -> Result<GenFile, ApplyError> {
-    let gen = GenFile::new();
-    let maybe_infile: Result<File, Error> = template.open();
+    let gen = GenFile::new()?;
+    let maybe_infile = template.open();
     let infile = maybe_infile
         .map_err(|e|ApplyError::FileReadError(format!("{:?} {:?}", template, e)))?;
-    let reader = BufReader::new(infile);
-    let mut tmpfile: &File = gen.open();
+    let reader = BufReader::new(infile.file());
+    let mut tmpfile = gen.open()?;
     for maybe_line in reader.lines() {
         let line: String = maybe_line.unwrap();
         match replace_line(vars, line.clone()) {

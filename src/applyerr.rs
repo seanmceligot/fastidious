@@ -17,7 +17,7 @@ pub enum ApplyError {
 
     #[error("file read error: {0}")]
     FileReadError(String),
-    
+
     #[error("file read error: {0}")]
     FileWriteError(String),
 
@@ -59,7 +59,10 @@ pub enum ApplyError {
     DiffFailed(String),
 
     #[error("Copy Error {0} {1}")]
-    CopyError(String, String)
+    CopyError(String, String),
+
+    #[error("Execute Error {0}")]
+    ExecError(String)
 }
 #[derive(Debug, Copy, Clone)]
 pub enum Verb {

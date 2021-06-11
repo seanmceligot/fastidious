@@ -9,7 +9,6 @@ use diff::DiffStatus;
 use applyerr::log_cmd_action;
 use applyerr::ApplyError;
 use applyerr::Verb;
-use filter::generate_filtered_file;
 use template::{generate_recommended_file, replace_line, ChangeString};
 use userinput::ask;
 use files::DestFile;
@@ -28,6 +27,10 @@ use std::process::Command;
 use std::slice::Iter;
 use std::str;
 
+use crate::cmd::Script;
+use crate::cmd::VirtualFile;
+
+/*
 #[derive(Debug)]
 pub enum VirtualFile {
     FsPath(String),
@@ -51,7 +54,7 @@ impl From<VirtualFile> for PathBuf {
         }
     }
 }
-
+*/
 pub(crate) fn print_usage(program: &str) {
     println!("{}", program);
     println!("v key value            set template variable ");
@@ -60,8 +63,7 @@ pub(crate) fn print_usage(program: &str) {
     println!("-- x command -arg      run command (add -- to make sure hyphens are passed on");
 }
 #[derive(Debug)]
-enum Action<'a> {
-    Filter(String, String, String, Vec<&'a String>),
+enum Action {
     Template(VirtualFile, String),
     Execute(String),
     Error(String),
@@ -69,7 +71,6 @@ enum Action<'a> {
 }
 #[derive(Debug)]
 enum Type {
-    Filter,
     Template,
     Execute,
     //InputFile,
@@ -83,10 +84,6 @@ fn test_parse_type() {
         Type::Template => {}
         _ => panic!("expected Template"),
     }
-    match parse_type(&String::from("f")) {
-        Type::Filter => {}
-        _ => panic!("expected Filter"),
-    }
     match parse_type(&String::from("x")) {
         Type::Execute => {}
         _ => panic!("expected Execute"),
@@ -98,7 +95,6 @@ fn test_parse_type() {
 }
 fn parse_type(input: &str) -> Type {
     match input {
-        "f" => Type::Filter,
         "t" => Type::Template,
         "x" => Type::Execute,
         "v" => Type::Variable,
@@ -108,18 +104,6 @@ fn parse_type(input: &str) -> Type {
         }
     }
 }
-fn process_filter_file<'t>(
-    mode: Mode,
-    vars: &'t HashMap<&'_ str, &'_ str>,
-    template: &SrcFile,
-    dest: &DestFile,
-    cmd: String,
-    args: Vec<&String>,
-) -> Result<DiffStatus, ApplyError> {
-    let gen = generate_filtered_file(vars, template, cmd, args)?;
-    create_or_diff(mode, template, dest, &gen)
-}
-
 fn process_template_file<'t>(
     mode: Mode,
     vars: &'t HashMap<&'_ str, &'_ str>,
@@ -219,24 +203,8 @@ fn do_action<'g>(
     action: Action,
 ) -> Result<(), ApplyError> {
     match action {
-        Action::Filter(intput_file_name, output_file_name, cmd, args) => {
-            let intput_file = SrcFile::new(PathBuf::from(intput_file_name));
-            let output_file = DestFile::new(mode, PathBuf::from(output_file_name));
-
-            match process_filter_file(mode, &vars, &intput_file, &output_file, cmd, args) {
-                Err(e) => {
-                    println!(
-                        "do_action: {} {}",
-                        Red.paint("error:"),
-                        Red.paint(e.to_string())
-                    );
-                    Err(e)
-                }
-                _ => Ok(()),
-            }
-        }
         Action::Template(template_file_name, output_file_name) => {
-            let template_file = SrcFile::new(PathBuf::from(template_file_name));
+            let template_file = SrcFile::new(template_file_name);
             let output_file = DestFile::new(mode, PathBuf::from(output_file_name));
 
             match process_template_file(mode, &vars, &template_file, &output_file) {
@@ -303,7 +271,7 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
         while let Some(input) = input_list.next() {
             let t: Type = parse_type(input);
             let mut cmd = String::new();
-            let mut cmdargs: Vec<&String> = Vec::new();
+            let mut cmdargs: Vec<String> = Vec::new();
             let action = match t {
                 Type::Template => {
                     let infile = String::from(
@@ -316,29 +284,7 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
                             .next()
                             .expect("expected output: tp template output"),
                     );
-                    Action::Template(VirtualFile::FsPath(infile), outfile)
-                }
-                Type::Filter => {
-                    let infile = String::from(
-                        input_list
-                            .next()
-                            .expect("expected input file: f  input output cmd ..."),
-                    );
-                    let outfile = String::from(
-                        input_list
-                            .next()
-                            .expect("expected output file: f  input output cmd ..."),
-                    );
-                    let cmd = String::from(
-                        input_list
-                            .next()
-                            .expect("expected executable: f  input output cmd ..."),
-                    );
-                    while let Some(input) = input_list.next() {
-                        cmdargs.push(input)
-                    }
-                    //input_list.collect::<Vec<String>>().map(|s|cmdargs.)
-                    Action::Filter(infile, outfile, cmd, cmdargs)
+                    Action::Template(VirtualFile::FsPath(PathBuf::from(infile)), outfile)
                 }
                 Type::Variable => {
                     match expect_option(input_list.next(), "expected key: v key value") {

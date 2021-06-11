@@ -1,11 +1,17 @@
 
 use log::trace;
+use temp_file::TempFile;
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
+
+use crate::applyerr::ApplyError;
+use crate::cmd::OpenFileHolder;
+use crate::cmd::Script;
+use crate::cmd::VirtualFile;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
@@ -15,20 +21,16 @@ pub enum Mode {
 }
 #[derive(Debug)]
 pub struct SrcFile {
-    path: PathBuf,
+    path: VirtualFile,
 }
 
 impl SrcFile {
-    pub fn new(p: PathBuf) -> SrcFile {
-        SrcFile { path: p }
+    pub fn new(path: VirtualFile) -> SrcFile {
+        SrcFile { path: path }
     }
-    pub fn open(&self) -> Result<File, std::io::Error> {
-        trace!("open path {:?}", self.path);
-        OpenOptions::new()
-            .read(true)
-            .write(false)
-            .create(false)
-            .open(&self.path)
+    pub fn open(&self) -> Result<OpenFileHolder, ApplyError> {
+        trace!("SrcFile::open {:?}", self.path);
+        self.path.open_readonly()
     }
 }
 
@@ -50,31 +52,37 @@ impl DestFile {
 }
 #[derive(Debug)]
 pub struct GenFile {
-    file: tempfile::NamedTempFile,
+    file: temp_file::TempFile,
 }
 impl GenFile {
-    pub fn new() -> GenFile {
-        GenFile {
-            file: tempfile::NamedTempFile::new().unwrap(),
-        }
+    pub fn new() -> Result<GenFile, ApplyError> {
+        let tf = TempFile::new()
+            .map_err(|e|
+                ApplyError::FileWriteError(
+                    format!("{:?} {:?}", "gen", e)))?;
+
+        Ok(GenFile { file:tf })
     }
-    pub fn open(&self) -> &File {
-        self.file.as_file()
+    pub fn open(&self) -> Result<File, ApplyError> {
+        debug!("GenFile::open {:?}", self.file.path());
+        let f = OpenOptions::new().write(true).create(true).open(self.file.path())
+            .map_err(|e|ApplyError::FileWriteError(format!("{:?} {:?}", "gen", e)))?;
+        Ok(f)
     }
     pub fn path(&self) -> &Path {
         self.file.path()
     }
 }
-
+/*
 impl Default for GenFile {
     fn default() -> Self {
         GenFile::new()
     }
-}
+} */
 
 impl fmt::Display for SrcFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.path.display())
+        write!(f, "{:?}", self.path)
     }
 }
 
@@ -94,11 +102,13 @@ impl AsRef<OsStr> for DestFile {
         self.path.as_os_str()
     }
 }
+/*
 impl AsRef<OsStr> for SrcFile {
     fn as_ref(&self) -> &OsStr {
         self.path.as_os_str()
     }
 }
+ */
 impl AsRef<OsStr> for GenFile {
     fn as_ref(&self) -> &OsStr {
         self.path().as_os_str()

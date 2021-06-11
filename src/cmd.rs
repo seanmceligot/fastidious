@@ -1,17 +1,40 @@
 
 use std::{collections::HashMap, env, fs::{File, OpenOptions}, io::{self, Write}, path::{Path, PathBuf}, process::Command};
 use ansi_term::Colour::{Green, Red, Yellow};
-use tempfile::NamedTempFile;
+use seahorse::App;
+use temp_file::{self, TempFile};
 use crate::applyerr::ApplyError;
+use std::io::Read;
+
+
+#[test]
+fn test_virtual_file() -> Result<(), ApplyError> {
+    dotenv::dotenv().ok();
+    env_logger::init();
+    let text =String::from("Hello");
+    let vf = VirtualFile::InMemory(text.clone());
+    let mut s = String::new();
+    let o = vf.open_readonly()?;
+    debug!("path {:?}", o.path());
+    match o.file().read_to_string(&mut s) {
+        Err(why) => panic!("couldn't read src: {}", why),
+        Ok(_) => {
+            debug!("src contains: {} {}", s, s);
+            assert_eq!(s, text);
+        }
+    }
+    Ok(())
+}
 
 #[derive(Debug)]
 pub enum Script {
     FsPath(PathBuf),
     InMemory(String)
 }
+pub type VirtualFile = Script;
 impl Script {
-    fn open_readonly(&self) -> Result<OpenFileHolder,ApplyError> {
-        match (self) {
+    pub fn open_readonly(&self) -> Result<OpenFileHolder,ApplyError> {
+        match self {
             Script::FsPath(path) => {
                 let maybe_file =OpenOptions::new().read(true).open(path);
                 let f = maybe_file.map_err(|e| 
@@ -19,29 +42,31 @@ impl Script {
                 Ok(OpenFileHolder::Perm(f, path.to_path_buf()))
             },
             Script::InMemory(source) => {
-                let mut t = tempfile::NamedTempFile::new().unwrap();
+                let temp = temp_file::with_contents(source.as_bytes());
                 debug!("contents: {}", source);
-                t.write_all(source.as_bytes()).
-                    map_err(|e|ApplyError::FileWriteError(format!("{:?} {:?}", t.path(), e)))?;
-                Ok(OpenFileHolder::Temp(t))
+                let f = OpenOptions::new()
+                    .read(true)
+                    .open(temp.path())
+                    .map_err(|e|ApplyError::FileReadError(format!("{:?} {:?}", temp.path(), e)))?;
+                Ok(OpenFileHolder::Temp(f, temp))
             }
         }
     }
 }
-enum OpenFileHolder {
-    Temp(NamedTempFile),
+pub enum OpenFileHolder {
+    Temp(File, TempFile),
     Perm(File, PathBuf) 
 }
 impl OpenFileHolder {
-    fn file(&self) -> &File {
+    pub(crate) fn file(&self) -> &File {
         match self {
-            OpenFileHolder::Temp(named) => named.as_file(),
+            OpenFileHolder::Temp(f, _tf) => f,
             OpenFileHolder::Perm(f, _p) => f
         }
     }
-    fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &Path {
         match self {
-            OpenFileHolder::Temp(named) => named.path(),
+            OpenFileHolder::Temp(_f, t) => t.path(),
             OpenFileHolder::Perm(_f,p) => p
         }
 
