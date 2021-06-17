@@ -1,6 +1,8 @@
 extern crate libc;
+use env_logger::Env;
+use seahorse::App;
 use userinput::ask;
-use std::path::Path;
+use std::{env, path::{PathBuf}};
 //use std::path::PathBuf;
 use applyerr::{log_path_action, ApplyError, Verb::SKIPPED};
 use files::Mode;
@@ -12,110 +14,137 @@ use log::trace;
 //use std::{println as trace};
 
 #[test]
-fn test_can() {
-    assert_eq!(
-        can_create_dir_maybe(Path::new("/root/test").parent()).is_err(),
-        true
-    ); // /root
-    assert_eq!(
-        can_create_dir_maybe(Path::new("./Cargo.toml").parent()).is_ok(),
-        true
-    ); // ./
-    assert_eq!(can_write_file(Path::new("tmp.txt")).is_ok(), true);
-    assert_eq!(can_write_file(Path::new("./tmp.txt")).is_ok(), true);
-    assert_eq!(can_create_dir(Path::new(".")).is_ok(), true);
+fn test_can() -> Result<(), ApplyError> {
+    
+    assert!(can_create_parent_dir(PathBuf::from("/root/test")).is_err());
+    can_create_parent_dir(PathBuf::from("./Cargo.toml"))?;
+    assert!(can_write_file(PathBuf::from("tmp.txt")).is_ok());
+    assert!(can_write_file(PathBuf::from("./tmp.txt")).is_ok());
+    assert!(can_create_dir(PathBuf::from(".")).is_ok());
+    assert!(can_read_file(PathBuf::from("Cargo.toml")).is_ok());
+    assert!(can_execute(PathBuf::from("/usr/bin/true")).is_ok() );
+    Ok(())
 }
 
-//pub fn assert_nonempty_path(path: &Path) -> Result<(), ApplyError> { match path { None => Err(ApplyError::PathEmpty), _ => Ok(()) } }
+//pub fn assert_nonempty_path(path: PathBuf) -> Result<(), ApplyError> { match path { None => Err(ApplyError::PathEmpty), _ => Ok(()) } }
 
-fn access_w(path: &Path) -> bool {
+fn access_w(path: PathBuf) -> Result<(), ApplyError> {
     let cstr = CString::new(path.display().to_string()).unwrap();
     unsafe {
-        matches!(libc::faccessat(libc::AT_FDCWD, cstr.as_ptr(), libc::W_OK, libc::AT_EACCESS) as isize, 0)
+        if matches!(libc::faccessat(libc::AT_FDCWD, cstr.as_ptr(), libc::W_OK, libc::AT_EACCESS) as isize, 0) {
+            Ok(())
+        } else {
+            Err(ApplyError::InsufficientPrivileges(format!("write {:?}", path)))
+        }
     }
 }
-fn access_x(path: &Path) -> bool {
+fn access_r(path: PathBuf) -> Result<(), ApplyError> {
     let cstr = CString::new(path.display().to_string()).unwrap();
     unsafe {
-        matches!(libc::faccessat(libc::AT_FDCWD, cstr.as_ptr(), libc::X_OK, libc::AT_EACCESS) as isize, 0)
+        if matches!(libc::faccessat(libc::AT_FDCWD, cstr.as_ptr(), libc::R_OK, libc::AT_EACCESS) as isize, 0) {
+            Ok(())
+        } else {
+            Err(ApplyError::InsufficientPrivileges(format!("read {:?}", path)))
+
+        }
     }
 }
-pub fn can_write_file(path: &Path) -> Result<&Path, ApplyError> {
+
+fn access_x(path: PathBuf) -> Result<(), ApplyError> {
+    let cstr = CString::new(path.display().to_string()).unwrap();
+    unsafe {
+        if matches!(libc::faccessat(libc::AT_FDCWD, cstr.as_ptr(), libc::X_OK, libc::AT_EACCESS) as isize, 0) {
+            Ok(()) 
+        } else {
+            Err(ApplyError::InsufficientPrivileges(format!("execute {:?}", path)))
+        }
+    }
+}
+pub fn can_write_file(path: PathBuf) -> Result<(), ApplyError> {
     trace!("can_write_file{:?}", path);
     if path.exists() {
-        if access_w(path) {
-            Ok(path)
-        } else {
-            Err(ApplyError::InsufficientPrivileges(
-                path.display().to_string(),
-            ))
-        }
+        access_w(path)
     } else {
-        can_write_dir_maybe(path.parent())
+        can_write_to_parent_dir(path)
     }
 }
-pub fn can_write_dir_maybe(maybe_dir: Option<&Path>) -> Result<&Path, ApplyError> {
-    trace!("can_write_dir_maybe {:?}", maybe_dir);
-    match maybe_dir {
-        Some(dir) => can_write_dir(dir),
-        None => Err(ApplyError::PathNotFound0),
+pub fn can_write_to_parent_dir(path: PathBuf) -> Result<(), ApplyError> {
+    trace!("can_write_to_parent_dir {:?}", path);
+    match path.parent() {
+        Some(dir) =>  can_write_dir(dir.to_path_buf()),
+        None => {
+            // relative, use current_dir
+            let pwd = env::current_dir().map_err(
+                |e| ApplyError::PathNotFound(".".into()))?;     
+            can_write_dir(pwd)
+        }
     }
 }
-pub fn can_write_dir(dir: &Path) -> Result<&Path, ApplyError> {
+pub fn can_write_dir(dir: PathBuf) -> Result<(), ApplyError> {
     trace!("can_write_dir{:?}", dir);
-    if dir.file_name().is_none() {
-        let pwd = Path::new(".");
-        if access_w(pwd) {
-            Ok(pwd)
+    if dir.exists() {
+        access_w(dir)
+    } else {
+        // backtrack to find an existing directory to check permissions
+        can_create_parent_dir(dir)
+    }
+}
+pub fn can_create_parent_dir(child: PathBuf) -> Result<(), ApplyError> {
+    trace!("can_create_parent_dir {:?}", child);
+    match child.parent() {
+        None => can_create_dir(PathBuf::from(".")),
+        Some(parent) => can_create_dir(parent.to_path_buf())
+    }
+}
+pub fn can_execute(path: PathBuf) -> Result<(), ApplyError> {
+    trace!("can_execute{:?}", path);
+    let r =if path.exists() {
+        if !path.is_dir() {
+           access_x(path)
         } else {
-            Err(ApplyError::InsufficientPrivileges(
-                pwd.display().to_string(),
-            ))
-        }
-    } else if dir.exists() {
-        if access_w(dir) {
-            Ok(dir)
-        } else {
-            Err(ApplyError::InsufficientPrivileges(
-                dir.display().to_string(),
-            ))
+            Err(ApplyError::NotAFile(path))
         }
     } else {
-        can_create_dir_maybe(dir.parent())
-    }
+        Err(ApplyError::PathNotFound(format!("{:?}", path)))
+    };
+    r
 }
-pub fn can_create_dir_maybe(maybe_dir: Option<&Path>) -> Result<&Path, ApplyError> {
-    trace!("can_create_dir_maybe {:?}", maybe_dir);
-    match maybe_dir {
-        Some(dir) => can_create_dir(dir),
-        None => Err(ApplyError::PathNotFound0),
-    }
+pub fn can_read_file(path: PathBuf) -> Result<(), ApplyError> {
+    trace!("can_read_file{:?}", path);
+    let r =if path.exists() {
+        if !path.is_dir() {
+           access_r(path)
+        } else {
+            Err(ApplyError::NotAFile(path))
+        }
+    } else {
+        Err(ApplyError::PathNotFound(format!("{:?}", path)))
+    };
+    r
 }
-pub fn can_create_dir(dir: &Path) -> Result<&Path, ApplyError> {
+
+
+pub fn can_create_dir(dir: PathBuf) -> Result<(), ApplyError> {
     trace!("can_create_dir{:?}", dir);
     if dir.exists() {
-        if access_x(dir) {
-            Ok(dir)
-        } else {
-            Err(ApplyError::InsufficientPrivileges(
-                dir.display().to_string(),
-            ))
-        }
+        access_x(dir)
     } else {
-        can_create_dir_maybe(dir.parent())
+        can_create_parent_dir(dir)
     }
 }
-pub fn create_dir_maybe(mode: Mode, maybe_dir: Option<&Path>) -> Result<&Path, ApplyError> {
-    trace!("create_dir_maybe {:?}", maybe_dir);
-    match maybe_dir {
-        Some(dir) => create_dir(mode, dir),
-        None => Err(ApplyError::PathNotFound0),
+pub fn create_parent_dir(mode: Mode, child: PathBuf) -> Result<(), ApplyError> {
+    trace!("create_dir_maybe {:?}", child);
+    match child.parent() {
+        Some(dir) => create_dir(mode, dir.to_path_buf()),
+        None => Err(ApplyError::InsufficientPrivileges(
+            format!("create parent dir {:?}",child)
+        ))
     }
 }
-pub fn create_dir(mode: Mode, dir: &Path) -> Result<&Path, ApplyError> {
+pub fn create_dir(mode: Mode, dir: PathBuf) -> Result<(), ApplyError> {
     trace!("create_dir{:?}", dir);
     if dir.exists() {
-        Ok(dir)
+        Ok(())
     } else {
         let ans = match mode {
             Mode::Passive => 'n',
@@ -123,19 +152,12 @@ pub fn create_dir(mode: Mode, dir: &Path) -> Result<&Path, ApplyError> {
             Mode::Interactive => ask(format!("create directory {} (y/n)", dir.display()).as_str()),
         };
         match ans {
-            'n' => match can_create_dir_maybe(dir.parent()) {
-                Err(e) => Err(e),
-                Ok(dir) => {
-                    log_path_action("create dir", SKIPPED, dir);
-                    Ok(dir)
-                }
-            },
+            'n' => can_create_parent_dir(dir),
             'y' => {
-                println!("mkdir {}", dir.display());
-                match std::fs::create_dir_all(dir) {
-                    Err(e) => Err(ApplyError::IoError(e)),
-                    Ok(_) => Ok(dir),
-                }
+                println!("mkdirs {:?}", dir);
+                std::fs::create_dir_all(dir.clone()).map_err(
+                    |e| ApplyError::InsufficientPrivileges(
+                        format!("create_dir_all {:?} {:?}", dir.clone(), e)))
             }
             _ => create_dir(mode, dir), //repeat the question
         }

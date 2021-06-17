@@ -2,9 +2,7 @@ use ansi_term::Colour::{Red, Yellow};
 use cmd::exectable_full_path;
 use applyerr::{ApplyError, color_from_verb};
 use applyerr::Verb::{LIVE, SKIPPED, WOULD};
-use fs::can_create_dir_maybe;
 use fs::can_write_file;
-use fs::create_dir_maybe;
 use userinput::ask;
 use files::Mode;
 use files::{DestFile, GenFile, SrcFile};
@@ -17,6 +15,7 @@ use std::process::ExitStatus;
 use std::vec::IntoIter;
 use ansi_term::Colour;
 use crate::applyerr::Verb;
+use crate::fs::{can_create_dir, can_create_parent_dir, create_parent_dir};
 
 #[derive(Debug)]
 pub struct DiffText<'f> {
@@ -49,7 +48,7 @@ pub fn log_template_action(
     );
 }
 
-pub fn diff<'f>(path: &'f Path, path2: &'f Path) -> DiffStatus {
+pub fn diff(path: PathBuf, path2: PathBuf) -> DiffStatus {
     debug!("diff {} {}", path.display(), path2.display());
     if !path2.exists() {
         DiffStatus::NewFile
@@ -74,7 +73,7 @@ pub fn create_or_diff(
     dest: &DestFile,
     gen: &GenFile,
 ) -> Result<DiffStatus, ApplyError> {
-    debug!("create_or_diff: diff {:?} {:?}", gen.path(), dest.path());
+    debug!("create_or_diff: diff {:?} {:?}", gen, dest.path());
     diff(gen.path(), dest.path());
     match update_from_template(mode, template, gen, dest) {
         Ok(_) => Ok(diff(gen.path(), dest.path())),
@@ -123,34 +122,17 @@ pub fn update_from_template<'f>(
     }
 }
 fn create_passive(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(), ApplyError> {
-    match can_create_dir_maybe(dest.path().parent()) {
-        Err(_e) => Err(ApplyError::InsufficientPrivileges(dest.to_string())),
-        Ok(_) => {
-            log_template_action("create from template", WOULD, template, gen, dest);
-            Ok(())
-        }
-    }
+    can_create_parent_dir(dest.path())?;
+    can_create_parent_dir(gen.path())
 }
 fn copy_active(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(), ApplyError> {
-    match create_dir_maybe(Mode::Active, dest.path().parent()) {
-        Err(ApplyError::PathNotFound0) => {
-            Err(ApplyError::InsufficientPrivileges(dest.to_string()))
+    create_parent_dir(Mode::Active, dest.path())?;
+    log_template_action("create from template", LIVE, template, gen, dest);
+    match std::fs::copy(gen.path(), dest.path()) {
+        Err(e) => {
+            Err(ApplyError::CopyError(gen.path(), dest.path()))
         }
-        Err(e) => Err(e),
-        Ok(_dir) => {
-            log_template_action("create from template", LIVE, template, gen, dest);
-            match std::fs::copy(gen.path(), dest.path()) {
-                Err(e) => {
-                    println!(
-                        "{} {}",
-                        Red.paint("error: copy failed"),
-                        Red.paint(e.to_string())
-                    );
-                    Err(ApplyError::Error(format!("copy failed {:?} {:?}", gen.path(), dest.path())))
-                }
-                Ok(_) => Ok(()),
-            }
-        }
+        Ok(_) => Ok(()),
     }
 }
 fn copy_interactive(

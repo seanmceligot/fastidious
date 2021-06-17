@@ -1,6 +1,5 @@
 
 use ansi_term::Colour::{Green, Red, Yellow};
-use cmd::cmdline;
 use cmd::exectable_full_path;
 use diff::create_or_diff;
 use diff::diff;
@@ -9,6 +8,7 @@ use diff::DiffStatus;
 use applyerr::log_cmd_action;
 use applyerr::ApplyError;
 use applyerr::Verb;
+use env_logger::Env;
 use template::{generate_recommended_file, replace_line, ChangeString};
 use userinput::ask;
 use files::DestFile;
@@ -27,7 +27,9 @@ use std::process::Command;
 use std::slice::Iter;
 use std::str;
 
+use crate::cmd::Args;
 use crate::cmd::Script;
+use crate::cmd::Vars;
 use crate::cmd::VirtualFile;
 
 /*
@@ -63,9 +65,9 @@ pub(crate) fn print_usage(program: &str) {
     println!("-- x command -arg      run command (add -- to make sure hyphens are passed on");
 }
 #[derive(Debug)]
-enum Action {
+pub enum Action {
     Template(VirtualFile, String),
-    Execute(String),
+    Execute(Script, Args),
     Error(String),
     None,
 }
@@ -106,7 +108,7 @@ fn parse_type(input: &str) -> Type {
 }
 fn process_template_file<'t>(
     mode: Mode,
-    vars: &'t HashMap<&'_ str, &'_ str>,
+    vars: Vars,
     template: &SrcFile,
     dest: &DestFile,
 ) -> Result<DiffStatus, ApplyError> {
@@ -116,8 +118,10 @@ fn process_template_file<'t>(
 
 #[test]
 fn test_execute_active() -> Result<(), ApplyError> {
-    execute_active("/bin/true")?;
-    match execute_active("/bin/false") {
+    let always_true = Script::FsPath(PathBuf::from("/bin/true"));
+    let always_false = Script::FsPath(PathBuf::from("/bin/false"));
+    execute_active(&always_true, Args::new(), &Vars::new())?;
+    match execute_active(&always_false, Args::new(), &Vars::new()) {
         Err(e) => println!(
             "{} {}",
             Red.paint("/bin/false returned: "),
@@ -125,39 +129,31 @@ fn test_execute_active() -> Result<(), ApplyError> {
         ),
         _ => return Err(ApplyError::Error(String::from("OK not expected"))),
     }
-    execute_active("echo echo_ping")?;
+    execute_active(&Script::InMemory("#! /bin/bash\necho hello".into()), Args::new(), &Vars::new())?;
     Ok(())
 }
 
-fn execute_inactive(raw_cmd: &str) -> Result<(), ApplyError> {
-    let empty_vec: Vec<&str> = Vec::new();
-    let v: Vec<&str> = raw_cmd.split(' ').collect();
-    let (cmd, args): (&str, Vec<&str>) = match v.as_slice() {
-        [] => ("", empty_vec),
-        //[cmd] => (cmd, empty_vec),
-        [cmd, args @ ..] => (cmd, args.to_vec()),
-    };
-    match cmd {
-        "" => Err(ApplyError::ExpectedArg("x command")),
-        _ => {
-            trace!("{}", cmd);
-            let exe_path = exectable_full_path(cmd)?;
-            trace!("{:?}", exe_path);
-            trace!("{:?}", args);
-            let cli = cmdline(exe_path.display().to_string(), args);
+fn execute_inactive(script: &Script, args: Args, vars: &Vars) -> Result<(), ApplyError> {
+    //        let exe_path = exectable_full_path(cmd)?;
+            let cli = format!("{:?} {} {:?}", vars, script, args);
             log_cmd_action("run", Verb::WOULD, cli);
             Ok(())
-        }
-    }
-}
 
-fn execute_active(cmd: &str) -> Result<(), ApplyError> {
-    let parts: Vec<&str> = cmd.split(' ').collect();
-    let output = Command::new(parts[0])
-        .args(&parts[1..])
-        .output()
-        .expect("cmd failed");
-    println!("{} {}", Green.paint("LIVE: run "), Green.paint(cmd));
+}
+fn execute_active(script: &Script, args: Vec<String>, vars: &Vars) -> Result<(), ApplyError> {
+    let o = script.as_executable()?;
+    let mut ps = Command::new(o.path());
+    debug!("execute_active {:?}", ps);
+    if args.len() > 0{
+        ps.args(args);
+    }
+    if vars.len() > 0 {
+        ps.envs(vars);
+    }
+    let output = ps.output().map_err(|e| ApplyError::ExecError(
+        format!("{:?} {:?}", script, e)
+    ))?;
+    println!("{} {}", Green.paint("LIVE: run "), format!("{}", script));
     io::stdout()
         .write_all(&output.stdout)
         .expect("error writing to stdout");
@@ -178,63 +174,40 @@ fn execute_active(cmd: &str) -> Result<(), ApplyError> {
     }
 }
 
-fn execute_interactive(cmd: &str) -> Result<(), ApplyError> {
-    match ask(&format!("run (y/n): {}", cmd)) {
+fn execute_interactive(script: &Script, args: Args, vars: &Vars) -> Result<(), ApplyError> {
+    match ask(&format!("run (y/n): {}", script)) {
         'n' => {
-            println!("{} {}", Yellow.paint("WOULD: run "), Yellow.paint(cmd));
+            println!("{} {}", Yellow.paint("WOULD: run "), script);
             Ok(())
         }
-        'y' => execute_active(cmd),
-        _ => execute_interactive(cmd),
+        'y' => execute_active(script, args, &vars),
+        _ => execute_interactive(script,args, vars),
     }
 }
 
-fn execute(mode: Mode, cmd: &str) -> Result<(), ApplyError> {
+pub fn execute(mode: Mode, cmd: &Script, args: Args, vars: &Vars) -> Result<(), ApplyError> {
     match mode {
-        Mode::Interactive => execute_interactive(cmd),
-        Mode::Passive => execute_inactive(cmd).map(|_pathbuf| ()),
-        Mode::Active => execute_active(cmd),
+        Mode::Interactive => execute_interactive(cmd, args, vars),
+        Mode::Passive => execute_inactive(cmd, args, vars),
+        Mode::Active => execute_active(cmd, args, vars),
     }
 }
 
-fn do_action<'g>(
+pub fn do_action<'g>(
     mode: Mode,
-    vars: &'g HashMap<&'g str, &'g str>,
+    vars: Vars,
     action: Action,
 ) -> Result<(), ApplyError> {
     match action {
         Action::Template(template_file_name, output_file_name) => {
             let template_file = SrcFile::new(template_file_name);
             let output_file = DestFile::new(mode, PathBuf::from(output_file_name));
-
-            match process_template_file(mode, &vars, &template_file, &output_file) {
-                Err(e) => {
-                    println!(
-                        "do_action: {} {}",
-                        Red.paint("error:"),
-                        Red.paint(e.to_string())
-                    );
-                    Err(e)
-                }
-                _ => Ok(()),
-            }
+            process_template_file(mode, vars, &template_file, &output_file)
+            .map(|_diff_status|())
         }
-        Action::Execute(cmd) => {
-            let the_cmd = match replace_line(vars, cmd.clone())? {
-                ChangeString::Changed(new_cmd) => new_cmd,
-                ChangeString::Unchanged => cmd,
-            };
-            match execute(mode, &the_cmd) {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    println!(
-                        "do_action: {} {}",
-                        Red.paint("error:"),
-                        Red.paint(e.to_string())
-                    );
-                    Err(e)
-                }
-            }
+        Action::Execute(cmd, args) => {
+            debug!("do_action execute {:?} {:?} {:?}", mode, cmd, args);
+            execute(mode, &cmd, args, &vars)
         }
         Action::Error(msg) => Err(ApplyError::Error(msg)),
         Action::None => Ok(()),
@@ -242,17 +215,17 @@ fn do_action<'g>(
 }
 
 #[test]
-fn test_do_action() {
-    let mut vars: HashMap<&str, &str> = HashMap::new();
-    vars.insert("value", "unit_test");
+fn test_do_action() ->Result<(), ApplyError> {
+    let _ = env_logger::Builder::from_env(Env::default().default_filter_or("trace")).try_init();
+    let mut vars: Vars = Vars::new();
+    vars.insert("value".into(), "FILLED".into());
     let template = Action::Template(
         VirtualFile::InMemory(String::from("key=@@value@@")),
-        String::from("/tmp/key_unit_test.txt"),
+        String::from("key_unit_test.txt"),
     );
-    match do_action(Mode::Passive, &vars, template) {
-        Ok(_) => {}
-        Err(_) => std::process::exit(1),
-    }
+    do_action(Mode::Passive, vars, template)?;
+    // cat key_unit_test.txt  should be key=FILLED
+    Ok(())
 }
 fn expect_option<R>(a: Option<R>, emsg: &str) -> Result<R, ApplyError> {
     match a {
@@ -264,73 +237,68 @@ fn expect_option<R>(a: Option<R>, emsg: &str) -> Result<R, ApplyError> {
     }
 }
 
-pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) {
+pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode)  -> Result<(), ApplyError>{
     debug!("dryrun {:?}", mode);
-    let mut vars: HashMap<&str, &str> = HashMap::new();
-    {
-        while let Some(input) = input_list.next() {
-            let t: Type = parse_type(input);
-            let mut cmd = String::new();
-            let mut cmdargs: Vec<String> = Vec::new();
-            let action = match t {
-                Type::Template => {
-                    let infile = String::from(
-                        input_list
-                            .next()
-                            .expect("expected template: tp template output"),
-                    );
-                    let outfile = String::from(
-                        input_list
-                            .next()
-                            .expect("expected output: tp template output"),
-                    );
-                    Action::Template(VirtualFile::FsPath(PathBuf::from(infile)), outfile)
-                }
-                Type::Variable => {
-                    match expect_option(input_list.next(), "expected key: v key value") {
-                        Ok(k) => {
-                            match expect_option(input_list.next(), "expected value: v key value") {
-                                Ok(v) => {
-                                    vars.insert(k, v);
-                                    Action::None
-                                }
-                                Err(_) => Action::Error(format!("expected variable value for {}", k)),
-                            }
-                        }
-                        Err(e) => {
-                            println!(
-                                "Variable: {} {}",
-                                Red.paint("error:"),
-                                Red.paint(e.to_string())
-                            );
-                            Action::Error(String::from("expected variable key"))
-                        }
-                    }
-                }
-                Type::Execute => {
-                    #[allow(clippy::while_let_on_iterator)]
-                    while let Some(input) = input_list.next() {
-                        if cmd.is_empty() {
-                            cmd.push_str(&input.to_string());
-                        } else {
-                            cmd.push(' ');
-                            cmd.push_str(&input.to_string());
-                        }
-                    }
-                    //let cmd_str: &str = cmd.as_str();
-                    Action::Execute(cmd)
-                }
-                Type::Unknown => {
-                    println!("{} {}", Red.paint("Unknown type:"), Red.paint(input));
-                    Action::Error(format!("Unknown type: {}", input))
-                }
-            };
-            //debug!("vars {:#?}", &vars);
-            debug!("action {:#?}", action);
-            match do_action(mode, &vars, action) {
-                Ok(a) => a,
-                Err(_) => std::process::exit(1),
+    let mut vars = Vars::new();
+    if let Some(input) = input_list.next() {
+        let t: Type = parse_type(input);
+        let action = match t {
+            Type::Template => {
+                let infile = String::from(
+                    input_list
+                        .next()
+                        .expect("expected template: tp template output"),
+                );
+                let outfile = String::from(
+                    input_list
+                        .next()
+                        .expect("expected output: tp template output"),
+                );
+                Action::Template(VirtualFile::FsPath(PathBuf::from(infile)), outfile)
             }
-        }
+            Type::Variable => {
+                match expect_option(input_list.next(), "expected key: v key value") {
+                    Ok(k) => {
+                        match expect_option(input_list.next(), "expected value: v key value") {
+                            Ok(v) => {
+                                vars.insert(k.into(), v.into());
+                                Action::None
+                            }
+                            Err(_) => Action::Error(format!("expected variable value for {}", k)),
+                        }
+                    }
+                    Err(e) => {
+                        println!(
+                            "Variable: {} {}",
+                            Red.paint("error:"),
+                            Red.paint(e.to_string())
+                        );
+                        Action::Error(String::from("expected variable key"))
+                    }
+                }
+            }
+            Type::Execute => {
+                match input_list.next() {
+                    None => Action::Error("expected execute path".into()),
+                    Some(cmd) => {
+                        let exe = exectable_full_path(cmd)?;
+                        let script = Script::FsPath(exe);
+                        let rest = input_list
+                            .map(|s|s.clone())
+                            .collect();
+                        Action::Execute(script, rest)       
+                    }
+                }
+            }
+            Type::Unknown => {
+                println!("{} {}", Red.paint("Unknown type:"), Red.paint(input));
+                Action::Error(format!("Unknown type: {}", input))
+            }
+        };
+        //debug!("vars {:#?}", &vars);
+        debug!("action {:#?}", action);
+        do_action(mode, vars.clone(), action)
+    } else {
+        Err(ApplyError::ExpectedArg("x t v"))
     }
 }

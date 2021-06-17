@@ -12,13 +12,11 @@ extern crate regex;
 extern crate seahorse;
 extern crate serde_derive;
 extern crate simple_logger;
-extern crate temp_file;
 extern crate thiserror;
 //extern crate toml;
 extern crate which;
 
 use ansi_term::Colour::{Green, Red, Yellow};
-use cmd::execute_script;
 use seahorse::{Flag, FlagType};
 //use failure::Error;
 use std::{collections::HashMap, env, io::{self, Write}, path::{Path, PathBuf}, process::Command};
@@ -71,6 +69,7 @@ fn main1() -> Result<(), ApplyError> {
     .flag(Flag::new("interactive", FlagType::Bool).alias("I"))
     .flag(Flag::new("iscript", FlagType::String).alias("P"))
     .flag(Flag::new("ascript", FlagType::String).alias("Z"))
+    .flag(Flag::new("var", FlagType::String).alias("V"))
 ;
 
     // use apply::execute_apply;
@@ -113,7 +112,16 @@ fn dry_action(c: &seahorse::Context) {
         mode = files::Mode::Interactive;
     }
     
-    dryrun::dryrun(c.args.iter(), mode);    
+    match dryrun::dryrun(c.args.iter(), mode) {
+        Ok(_) => {},
+        Err(e) => {
+            println!(
+                "{} {}",
+                Red.paint("error:"),
+                Red.paint(e.to_string())
+            );
+        }
+    }    
  }
 fn apply_action(c: &seahorse::Context) {
     match try_apply_action(c) {

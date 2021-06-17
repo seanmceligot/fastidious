@@ -7,46 +7,66 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::Error;
 use std::ops::Range;
+use std::usize;
 use regex::Regex;
 use regex::Match;
 
+use crate::cmd::Vars;
+
 #[test]
-fn test_regex() {
-    match match_line(String::from("a@@foo@@").as_str()) {
-        Some(("foo", _)) => {}
-        Some((_, _)) => panic!("fail"),
+fn test_match_line() {
+    let s1 = "a@@foo@@";
+    let s2 = "@@foo@@a";
+    let s3 = "@@foo@@";
+    match match_line(s1) {
+        Some(r) => {
+            assert_eq!(r.start, 3);
+            assert_eq!(r.end, 6);
+            assert_eq!(s1[r.start..r.end], *"foo");
+        },
         None => panic!("expected Template"),
     }
-    match match_line(String::from("@@foo@@a").as_str()) {
-        Some(("foo", _)) => {}
-        Some((_, _)) => panic!("fail"),
+    match match_line(s2) {
+        Some(r) => {
+            assert_eq!(r.start, 2);
+            assert_eq!(r.end, 5);
+            assert_eq!(s2[r.start..r.end], *"foo");
+        },
         None => panic!("expected Template"),
     }
-    match match_line(String::from("@@foo@@").as_str()) {
-        Some(("foo", _)) => {}
-        Some((_, _)) => panic!("fail"),
+    match match_line(s3) {
+        Some(r) => {
+            assert_eq!(s3[r.start..r.end], *"foo");
+        },
         None => panic!("expected Template"),
     }
 }
-fn match_line(line: & str) -> Option<(& str, Range<usize>)> {
-    let re = Regex::new(r"@@(?P<k>[A-Za-z0-9_\.-]*)@@").unwrap();
-    match re.captures(line) {
-        Some(cap) => {
-            let all: Match = cap.get(0).unwrap();
-            let k: Match = cap.name("k").unwrap();
-            let key = k.as_str();
-            Some((key, all.range()))
-        }
-        None => None,
+fn match_line<'a>(line: & 'a str) -> Option<Range<usize>> {
+    let start_match = "@@";
+    let slen = start_match.len();
+    let end_match = "@@";
+    match line.find(start_match) {
+        Some(match_start) => {   
+            match line[match_start+slen..].find(end_match) {
+                // a@@foo@@
+                Some(match_end) => {
+                    Some(Range { start: match_start+slen, end: match_end+match_start+slen })
+                }, 
+                None => None
+            }
+        },
+        None => None
     }
 }
 pub enum ChangeString {
     Changed(String),
     Unchanged,
 }
-pub fn replace_line(vars: &HashMap<&str, &str>, line: String) -> Result<ChangeString, ApplyError> {
+pub fn replace_line(vars: Vars, line: String) -> Result<ChangeString, ApplyError> {
     match match_line(line.as_str()) {
-        Some((key, range)) => {
+        Some(range) => {
+            debug!("slice {} {} {} {}", range.start, range.end, line, line.len());
+            let key = &line[range.start..range.end];
             let mut new_line: String = String::new();
             let v = vars.get(key);
             trace!("key {}", key);
@@ -70,7 +90,7 @@ pub fn replace_line(vars: &HashMap<&str, &str>, line: String) -> Result<ChangeSt
 }
 // creates the tmp file for comparing to the dest file
 pub fn generate_recommended_file<'a, 'b>(
-    vars: &'a HashMap<&str, &str>,
+    vars: Vars,
     template: &'b SrcFile,
 ) -> Result<GenFile, ApplyError> {
     let gen = GenFile::new()?;
@@ -81,7 +101,7 @@ pub fn generate_recommended_file<'a, 'b>(
     let mut tmpfile = gen.open()?;
     for maybe_line in reader.lines() {
         let line: String = maybe_line.unwrap();
-        match replace_line(vars, line.clone()) {
+        match replace_line(vars.clone(), line.clone()) {
             Ok(replaced_line) => match replaced_line {
                 ChangeString::Changed(new_line) => {
                     writeln!(tmpfile, "{}", new_line).expect("write failed");

@@ -1,28 +1,32 @@
 
-use std::{collections::HashMap, env, fs::{File, OpenOptions}, io::{self, Write}, path::{Path, PathBuf}, process::Command};
+use std::fmt;
+use std::os::unix::prelude::OpenOptionsExt;
+use std::{collections::HashMap, env, fmt::Debug, fs::{File, OpenOptions}, io::{self, Write}, path::{Path, PathBuf}, process::Command};
 use ansi_term::Colour::{Green, Red, Yellow};
+use env_logger::Env;
 use seahorse::App;
-use temp_file::{self, TempFile};
-use crate::applyerr::ApplyError;
+use crate::fs;
+use crate::{applyerr::ApplyError, dryrun::{Action, do_action}};
 use std::io::Read;
 
+pub type Vars = HashMap<String, String>;
+
+pub type Args = Vec<String>;
 
 #[test]
 fn test_virtual_file() -> Result<(), ApplyError> {
-    dotenv::dotenv().ok();
-    env_logger::init();
+    let _ = env_logger::Builder::from_env(Env::default().default_filter_or("trace")).try_init();
     let text =String::from("Hello");
     let vf = VirtualFile::InMemory(text.clone());
     let mut s = String::new();
-    let o = vf.open_readonly()?;
+    let r = vf.as_readable()?;
+    let o = r.open()?;
     debug!("path {:?}", o.path());
-    match o.file().read_to_string(&mut s) {
-        Err(why) => panic!("couldn't read src: {}", why),
-        Ok(_) => {
-            debug!("src contains: {} {}", s, s);
-            assert_eq!(s, text);
-        }
-    }
+    let n = o.file().read_to_string(&mut s).map_err(|e|
+        ApplyError::FileReadError(
+            format!("{:?} {}", o.path(), e)))?;
+    debug!("src contains: {} {}", n, s);
+    assert_eq!(s, text);
     Ok(())
 }
 
@@ -31,30 +35,114 @@ pub enum Script {
     FsPath(PathBuf),
     InMemory(String)
 }
+pub struct ExecutableFile {
+    path: PathBuf
+}
+impl ExecutableFile {
+    pub fn path(&self) -> PathBuf {
+        self.path.clone()
+    }
+}
+pub struct WriteableFile {
+    path: PathBuf
+}
+pub struct ReadableFile {
+    path: PathBuf
+}
+impl ReadableFile {
+    pub fn open(&self) -> Result<OpenFileHolder, ApplyError> {
+        let f = OpenOptions::new().read(true).open(self.path.clone())
+        .map_err(|e| 
+            ApplyError::FileReadError(format!("read error {:?} {:?}", self.path, e)))?;
+        Ok(OpenFileHolder::Perm(f, self.path.clone()))
+    }
+}
+
 pub type VirtualFile = Script;
 impl Script {
-    pub fn open_readonly(&self) -> Result<OpenFileHolder,ApplyError> {
+    pub fn as_executable(&self) -> Result<ExecutableFile, ApplyError> {
         match self {
-            Script::FsPath(path) => {
-                let maybe_file =OpenOptions::new().read(true).open(path);
-                let f = maybe_file.map_err(|e| 
-                    ApplyError::FileReadError(format!("read error {:?} {:?}", path, e)))?;
-                Ok(OpenFileHolder::Perm(f, path.to_path_buf()))
+            Script::FsPath(p) => {
+                fs::can_execute(p.clone())?;
+                Ok( ExecutableFile {path: p.clone()})
             },
             Script::InMemory(source) => {
-                let temp = temp_file::with_contents(source.as_bytes());
+                let path = PathBuf::from("tmp1.sh");
                 debug!("contents: {}", source);
-                let f = OpenOptions::new()
-                    .read(true)
-                    .open(temp.path())
-                    .map_err(|e|ApplyError::FileReadError(format!("{:?} {:?}", temp.path(), e)))?;
-                Ok(OpenFileHolder::Temp(f, temp))
+                write_file(
+            OpenOptions::new()
+                    .mode(0o755)
+                    .write(true)
+                    .create(true)
+                    .truncate(true), 
+                    path.clone(), source)?;
+                Ok( ExecutableFile {path: path.clone()})
+            }
+        }
+    }
+    pub fn as_readable(&self) -> Result<ReadableFile, ApplyError> {
+        match self {
+            Script::FsPath(p) => {
+                fs::can_read_file(p.clone())?;
+                Ok( ReadableFile {path: p.clone()})
+            },
+            Script::InMemory(source) => {
+                let path = PathBuf::from("tmp2.txt");
+                debug!("contents: {}", source);
+                write_file(OpenOptions::new()
+                .mode(0o0644)
+                .write(true)
+                .truncate(true)
+                .create(true), path.clone(), source)?;
+                Ok(ReadableFile {path: path})
             }
         }
     }
 }
+    /*
+    pub fn open_readonly(&self) -> Result<OpenFileHolder,ApplyError> {
+        self.open(
+            OpenOptions::new().read(true))
+    }
+
+    pub fn open_exec(&self) -> Result<OpenFileHolder,ApplyError> {
+        self.as_executable().
+        //self.open(  OpenOptions::new().write(true).create(true).mode(0o700))
+    }
+    pub fn open_write(&self) -> Result<OpenFileHolder,ApplyError> {
+        self.open(
+            OpenOptions::new().write(true).create(true).mode(0o600))
+    }
+    pub fn open(&self, options: &OpenOptions) -> Result<OpenFileHolder,ApplyError> {
+            match self {
+            Script::FsPath(path) => {
+                let f = OpenOptions::new().read(true).open(path)
+                .map_err(|e| 
+                    ApplyError::FileReadError(format!("read error {:?} {:?}", path, e)))?;
+                Ok(OpenFileHolder::Perm(f, path.to_path_buf()))
+            },
+            Script::InMemory(source) => {
+              
+                let readf = options
+                .open(path.clone())
+                .map_err(|e|ApplyError::FileCreateError(format!("{:?} {:?}", path, e)))?;
+                Ok(OpenFileHolder::Temp(readf, path))
+            }
+        }
+    }
+}
+ */
+impl fmt::Display for Script {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Script::FsPath(p) => write!(f, "{:?}", p),
+            Script::InMemory(s) => write!(f, "{}", s),
+        }
+    }
+}
+
 pub enum OpenFileHolder {
-    Temp(File, TempFile),
+    Temp(File, PathBuf),
     Perm(File, PathBuf) 
 }
 impl OpenFileHolder {
@@ -64,15 +152,15 @@ impl OpenFileHolder {
             OpenFileHolder::Perm(f, _p) => f
         }
     }
-    pub(crate) fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &PathBuf {
         match self {
-            OpenFileHolder::Temp(_f, t) => t.path(),
-            OpenFileHolder::Perm(_f,p) => p
+            OpenFileHolder::Temp(_f, p) => p,
+            OpenFileHolder::Perm(_f, p) => p
         }
 
     }
 }
-pub fn cmdline(cmd: String, args: Vec<&str>) -> String {
+pub fn _cmdline(cmd: String, args: Vec<&str>) -> String {
     let mut full = vec![cmd.as_str()];
     full.append(&mut args.to_vec());
     full.join(" ")
@@ -91,7 +179,7 @@ fn exectable_full_path_which(
         Err(_e) => Err(ApplyError::CommandNotFound(String::from(prg))),
     }
 }
-pub(crate) fn execute_script_file(cmdpath: &Path,  vars: HashMap<String, String>) -> Result<(), ApplyError> {
+pub(crate) fn _execute_script_file(cmdpath: &Path, vars: Vars) -> Result<(), ApplyError> {
     let cmdstr = cmdpath.as_os_str();
     debug!("run: {:#?}", cmdstr);
     let output = Command::new("bash")
@@ -124,7 +212,19 @@ pub(crate) fn execute_script_file(cmdpath: &Path,  vars: HashMap<String, String>
     }
 
 }
-pub(crate) fn execute_script(script: &Script,  vars: HashMap<String, String>) -> Result<(), ApplyError> {
-    let script_file = script.open_readonly()?;
-    Ok(execute_script_file(script_file.path(), vars)?)
+
+fn write_file(options: &mut OpenOptions, path: PathBuf, source: &String) -> Result<ExecutableFile, ApplyError> {
+    let mut f = options
+        .open(path.clone())
+        .map_err(|e|ApplyError::FileCreateError(format!("{:?} {:?}", path, e)))?;
+    f.write_all(source.as_bytes()).map_err(
+        |e|ApplyError::FileWriteError(format!("write_file {:?} {:?}", path, e)))?;
+    Ok(ExecutableFile {path:path})
 }
+
+/*
+pub(crate) fn execute_script(script: &Script,  vars: Vars) -> Result<(), ApplyError> {
+    do_action(crate::files::Mode::Passive, vars, Action::Execute(script.clone(), Vec::new()))
+    //Ok(execute_script_file(script_file.path(), vars)?)
+}
+ */

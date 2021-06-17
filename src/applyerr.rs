@@ -4,7 +4,7 @@ use thiserror::Error;
 use ansi_term::Colour;
 use std::{ffi::OsString, fmt};
 use std::fmt::Debug;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[non_exhaustive]
 #[derive(Error, Debug)]
@@ -17,6 +17,12 @@ pub enum ApplyError {
 
     #[error("file read error: {0}")]
     FileReadError(String),
+
+    #[error("path not found: {0}")]
+    PathNotFound(String),
+
+    #[error("file create error: {0}")]
+    FileCreateError(String),
 
     #[error("file read error: {0}")]
     FileWriteError(String),
@@ -58,11 +64,17 @@ pub enum ApplyError {
     #[error("Diff Error {0}")]
     DiffFailed(String),
 
+    #[error("not a file {0}")]
+    NotAFile(PathBuf),
+
     #[error("Copy Error {0} {1}")]
-    CopyError(String, String),
+    CopyError(PathBuf, PathBuf),
 
     #[error("Execute Error {0}")]
-    ExecError(String)
+    ExecError(String),
+
+    #[error("No Parent Dir {0}")]
+    NoParent(String)
 }
 #[derive(Debug, Copy, Clone)]
 pub enum Verb {

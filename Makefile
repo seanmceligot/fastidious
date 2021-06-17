@@ -5,13 +5,83 @@ dryrun_installed=noname dry
 dryrun=${dryrun_local}
 default: test
 
+test:  lint
+	RUST_BACKTRACE=1 RUST_LOG=debug cargo test --verbose
+
+lint:
+	cargo clippy
+
+format: 
+	cargo fmt
+
+build_verbose:
+	cargo build --verbose
+
+build:
+	cargo check 
+	cargo build
+
+clean:
+	cargo clean
+	rm -rvf out
+
+update:
+	cargo build
+
+install:
+	cargo install
+
+d:
+	./demo.sh
+
+
+##### test groups ####
+interactive: interactive x_interactive
+
+tests: passive active x x_active active_env xvar a a2 i noargs
+
+broken: f t_mkdir 
+
+notyet: unapply cmd apply_interactive apply_passive apply_interactive
+
+##### tests ####
+
+noargs: 
+	echo cp out1/myconfig project/myconfig
+	$(dryrun) 
+help:
+	$(dryrun) --help
+
+cmd:
+	${dryrun} v mode=600 if Makefile of /tmp/ cp %%if%% %%of%%
+
+unapply:
+	cargo run -- unapply example1 
+
+apply_with_var: 
+	cargo run -- apply --iscript 'test -f mysecret' --ascript 'echo {{SECRET}} > mysecret'
+	diff <(echo '') mysecret
+
+apply_passive: 
+	rm -v mysecret
+	cargo run -- apply --passive --iscript 'test -f mysecret' --ascript 'echo {{SECRET}} > mysecret'
+	diff <(echo '') mysecret
+apply_active: 
+	rm -v mysecret
+	cargo run --active apply --interactive --iscript 'test -f mysecret' --ascript 'echo {{SECRET}} > mysecret'
+	diff <(echo 'mypassword') mysecret
+apply_interactive: 
+	rm -v mysecret
+	cargo run -- apply --interactive --iscript 'test -f mysecret' --ascript 'echo {{SECRET}} > mysecret'
+	diff <(echo '') mysecret
+
 a2: 
 	cargo run -- apply --iscript 'test -f foo' --ascript 'touch foo'
 a:
 	cargo run -- apply example1 
 
 i:
-	cargo run -- is-applied example1 
+	cargo run -- is_applied example1 
 
 fix:
 	cargo fix
@@ -33,6 +103,7 @@ err_noval:
 	${dryrun} v x||true
 err_t_deny_mkdir:
 	$(dryrun) t <(echo foo) /root/foo/deleteme || true
+
 
 f:
 	$(dryrun) v key1 val1 f template/test.config template/upper.out /usr/bin/tr 'a-z' 'A-Z'
@@ -67,44 +138,3 @@ create:
 	rm -vf template/out.config
 	$(MAKE) active	
 
-test:  lint
-	RUST_BACKTRACE=1 RUST_LOG=debug cargo test --verbose
-
-help:
-	$(dryrun) --help
-
-lint:
-	cargo clippy
-
-format: 
-	cargo fmt
-
-verbose:
-	cargo build --verbose
-
-build:
-	cargo check 
-	cargo build
-
-noargs: 
-	echo cp out1/myconfig project/myconfig
-	$(dryrun) --debug
-
-cmd:
-	echo dryrun v mode=600 if Makefile of /tmp/ cp %%if%% %%of%%
-
-clean:
-	cargo clean
-	rm -rvf out
-
-update:
-	cargo build
-
-install:
-	cargo install
-
-d:
-	./demo.sh
-
-interactive: interactive x_interactive
-tests: passive active x x_active active_env xvar cmd 

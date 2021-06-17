@@ -1,6 +1,5 @@
 
 use log::trace;
-use temp_file::TempFile;
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs::File;
@@ -30,7 +29,7 @@ impl SrcFile {
     }
     pub fn open(&self) -> Result<OpenFileHolder, ApplyError> {
         trace!("SrcFile::open {:?}", self.path);
-        self.path.open_readonly()
+        self.path.as_readable()?.open()
     }
 }
 
@@ -46,40 +45,30 @@ impl DestFile {
     pub fn _exists(&self) -> bool {
         self.path.exists()
     }
-    pub fn path(&self) -> &Path {
-        self.path.as_path()
+    pub fn path(&self) -> PathBuf {
+        self.path.clone()
     }
 }
 #[derive(Debug)]
 pub struct GenFile {
-    file: temp_file::TempFile,
+    path: PathBuf,
 }
 impl GenFile {
     pub fn new() -> Result<GenFile, ApplyError> {
-        let tf = TempFile::new()
-            .map_err(|e|
-                ApplyError::FileWriteError(
-                    format!("{:?} {:?}", "gen", e)))?;
-
-        Ok(GenFile { file:tf })
+        let path = PathBuf::from("tmp1.txt");
+        Ok(GenFile { path: path})
+    }
+    pub fn path(&self) -> PathBuf {
+        self.path.clone()
     }
     pub fn open(&self) -> Result<File, ApplyError> {
-        debug!("GenFile::open {:?}", self.file.path());
-        let f = OpenOptions::new().write(true).create(true).open(self.file.path())
-            .map_err(|e|ApplyError::FileWriteError(format!("{:?} {:?}", "gen", e)))?;
-        Ok(f)
+        OpenOptions::new().write(true)
+        .truncate(true)
+        .create(true).open(self.path.clone())
+        .map_err(|e| ApplyError::FileWriteError(format!("Gen::open {:?} {:?}", self.path, e)))
     }
-    pub fn path(&self) -> &Path {
-        self.file.path()
-    }
+    //pub fn open(&self) -> std::fs::File {}
 }
-/*
-impl Default for GenFile {
-    fn default() -> Self {
-        GenFile::new()
-    }
-} */
-
 impl fmt::Display for SrcFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.path)
@@ -111,6 +100,6 @@ impl AsRef<OsStr> for SrcFile {
  */
 impl AsRef<OsStr> for GenFile {
     fn as_ref(&self) -> &OsStr {
-        self.path().as_os_str()
+        self.path.as_os_str()
     }
 }
