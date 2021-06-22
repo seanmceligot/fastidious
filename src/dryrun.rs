@@ -1,16 +1,13 @@
-
 use ansi_term::Colour::{Green, Red, Yellow};
+use applyerr::log_cmd_action;
+use applyerr::ApplyError;
+use applyerr::Verb;
 use cmd::exectable_full_path;
 use diff::create_or_diff;
 use diff::diff;
 use diff::update_from_template;
 use diff::DiffStatus;
-use applyerr::log_cmd_action;
-use applyerr::ApplyError;
-use applyerr::Verb;
 use env_logger::Env;
-use template::{generate_recommended_file, replace_line, ChangeString};
-use userinput::ask;
 use files::DestFile;
 use files::GenFile;
 use files::Mode;
@@ -26,6 +23,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::slice::Iter;
 use std::str;
+use template::{generate_recommended_file, replace_line, ChangeString};
+use userinput::ask;
 
 use crate::cmd::Args;
 use crate::cmd::Script;
@@ -129,30 +128,33 @@ fn test_execute_active() -> Result<(), ApplyError> {
         ),
         _ => return Err(ApplyError::Error(String::from("OK not expected"))),
     }
-    execute_active(&Script::InMemory("#! /bin/bash\necho hello".into()), Args::new(), &Vars::new())?;
+    execute_active(
+        &Script::InMemory("#! /bin/bash\necho hello".into()),
+        Args::new(),
+        &Vars::new(),
+    )?;
     Ok(())
 }
 
 fn execute_inactive(script: &Script, args: Args, vars: &Vars) -> Result<(), ApplyError> {
     //        let exe_path = exectable_full_path(cmd)?;
-            let cli = format!("{:?} {} {:?}", vars, script, args);
-            log_cmd_action("run", Verb::WOULD, cli);
-            Ok(())
-
+    let cli = format!("{:?} {} {:?}", vars, script, args);
+    log_cmd_action("run", Verb::WOULD, cli);
+    Ok(())
 }
 fn execute_active(script: &Script, args: Vec<String>, vars: &Vars) -> Result<(), ApplyError> {
     let o = script.as_executable()?;
     let mut ps = Command::new(o.path());
     debug!("execute_active {:?}", ps);
-    if args.len() > 0{
+    if args.len() > 0 {
         ps.args(args);
     }
     if vars.len() > 0 {
         ps.envs(vars);
     }
-    let output = ps.output().map_err(|e| ApplyError::ExecError(
-        format!("{:?} {:?}", script, e)
-    ))?;
+    let output = ps
+        .output()
+        .map_err(|e| ApplyError::ExecError(format!("{:?} {:?}", script, e)))?;
     println!("{} {}", Green.paint("LIVE: run "), format!("{}", script));
     io::stdout()
         .write_all(&output.stdout)
@@ -181,7 +183,7 @@ fn execute_interactive(script: &Script, args: Args, vars: &Vars) -> Result<(), A
             Ok(())
         }
         'y' => execute_active(script, args, &vars),
-        _ => execute_interactive(script,args, vars),
+        _ => execute_interactive(script, args, vars),
     }
 }
 
@@ -193,17 +195,12 @@ pub fn execute(mode: Mode, cmd: &Script, args: Args, vars: &Vars) -> Result<(), 
     }
 }
 
-pub fn do_action<'g>(
-    mode: Mode,
-    vars: Vars,
-    action: Action,
-) -> Result<(), ApplyError> {
+pub fn do_action<'g>(mode: Mode, vars: Vars, action: Action) -> Result<(), ApplyError> {
     match action {
         Action::Template(template_file_name, output_file_name) => {
             let template_file = SrcFile::new(template_file_name);
             let output_file = DestFile::new(mode, PathBuf::from(output_file_name));
-            process_template_file(mode, vars, &template_file, &output_file)
-            .map(|_diff_status|())
+            process_template_file(mode, vars, &template_file, &output_file).map(|_diff_status| ())
         }
         Action::Execute(cmd, args) => {
             debug!("do_action execute {:?} {:?} {:?}", mode, cmd, args);
@@ -215,7 +212,7 @@ pub fn do_action<'g>(
 }
 
 #[test]
-fn test_do_action() ->Result<(), ApplyError> {
+fn test_do_action() -> Result<(), ApplyError> {
     let _ = env_logger::Builder::from_env(Env::default().default_filter_or("trace")).try_init();
     let mut vars: Vars = Vars::new();
     vars.insert("value".into(), "FILLED".into());
@@ -237,7 +234,7 @@ fn expect_option<R>(a: Option<R>, emsg: &str) -> Result<R, ApplyError> {
     }
 }
 
-pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode)  -> Result<(), ApplyError>{
+pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) -> Result<(), ApplyError> {
     debug!("dryrun {:?}", mode);
     let mut vars = Vars::new();
     if let Some(input) = input_list.next() {
@@ -256,40 +253,32 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode)  -> Result<(), Ap
                 );
                 Action::Template(VirtualFile::FsPath(PathBuf::from(infile)), outfile)
             }
-            Type::Variable => {
-                match expect_option(input_list.next(), "expected key: v key value") {
-                    Ok(k) => {
-                        match expect_option(input_list.next(), "expected value: v key value") {
-                            Ok(v) => {
-                                vars.insert(k.into(), v.into());
-                                Action::None
-                            }
-                            Err(_) => Action::Error(format!("expected variable value for {}", k)),
-                        }
+            Type::Variable => match expect_option(input_list.next(), "expected key: v key value") {
+                Ok(k) => match expect_option(input_list.next(), "expected value: v key value") {
+                    Ok(v) => {
+                        vars.insert(k.into(), v.into());
+                        Action::None
                     }
-                    Err(e) => {
-                        println!(
-                            "Variable: {} {}",
-                            Red.paint("error:"),
-                            Red.paint(e.to_string())
-                        );
-                        Action::Error(String::from("expected variable key"))
-                    }
+                    Err(_) => Action::Error(format!("expected variable value for {}", k)),
+                },
+                Err(e) => {
+                    println!(
+                        "Variable: {} {}",
+                        Red.paint("error:"),
+                        Red.paint(e.to_string())
+                    );
+                    Action::Error(String::from("expected variable key"))
                 }
-            }
-            Type::Execute => {
-                match input_list.next() {
-                    None => Action::Error("expected execute path".into()),
-                    Some(cmd) => {
-                        let exe = exectable_full_path(cmd)?;
-                        let script = Script::FsPath(exe);
-                        let rest = input_list
-                            .map(|s|s.clone())
-                            .collect();
-                        Action::Execute(script, rest)       
-                    }
+            },
+            Type::Execute => match input_list.next() {
+                None => Action::Error("expected execute path".into()),
+                Some(cmd) => {
+                    let exe = exectable_full_path(cmd)?;
+                    let script = Script::FsPath(exe);
+                    let rest = input_list.map(|s| s.clone()).collect();
+                    Action::Execute(script, rest)
                 }
-            }
+            },
             Type::Unknown => {
                 println!("{} {}", Red.paint("Unknown type:"), Red.paint(input));
                 Action::Error(format!("Unknown type: {}", input))

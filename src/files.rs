@@ -1,4 +1,3 @@
-
 use log::trace;
 use std::ffi::OsStr;
 use std::fmt;
@@ -56,16 +55,18 @@ pub struct GenFile {
 impl GenFile {
     pub fn new() -> Result<GenFile, ApplyError> {
         let path = PathBuf::from("tmp1.txt");
-        Ok(GenFile { path: path})
+        Ok(GenFile { path: path })
     }
     pub fn path(&self) -> PathBuf {
         self.path.clone()
     }
     pub fn open(&self) -> Result<File, ApplyError> {
-        OpenOptions::new().write(true)
-        .truncate(true)
-        .create(true).open(self.path.clone())
-        .map_err(|e| ApplyError::FileWriteError(format!("Gen::open {:?} {:?}", self.path, e)))
+        OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(self.path.clone())
+            .map_err(|e| ApplyError::FileWriteError(format!("Gen::open {:?} {:?}", self.path, e)))
     }
     //pub fn open(&self) -> std::fs::File {}
 }

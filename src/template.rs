@@ -1,6 +1,8 @@
 use applyerr::ApplyError;
 use files::{GenFile, SrcFile};
 use log::trace;
+use regex::Match;
+use regex::Regex;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
@@ -8,8 +10,6 @@ use std::io::BufReader;
 use std::io::Error;
 use std::ops::Range;
 use std::usize;
-use regex::Regex;
-use regex::Match;
 
 use crate::cmd::Vars;
 
@@ -23,7 +23,7 @@ fn test_match_line() {
             assert_eq!(r.start, 3);
             assert_eq!(r.end, 6);
             assert_eq!(s1[r.start..r.end], *"foo");
-        },
+        }
         None => panic!("expected Template"),
     }
     match match_line(s2) {
@@ -31,31 +31,32 @@ fn test_match_line() {
             assert_eq!(r.start, 2);
             assert_eq!(r.end, 5);
             assert_eq!(s2[r.start..r.end], *"foo");
-        },
+        }
         None => panic!("expected Template"),
     }
     match match_line(s3) {
         Some(r) => {
             assert_eq!(s3[r.start..r.end], *"foo");
-        },
+        }
         None => panic!("expected Template"),
     }
 }
-fn match_line<'a>(line: & 'a str) -> Option<Range<usize>> {
+fn match_line<'a>(line: &'a str) -> Option<Range<usize>> {
     let start_match = "@@";
     let slen = start_match.len();
     let end_match = "@@";
     match line.find(start_match) {
-        Some(match_start) => {   
-            match line[match_start+slen..].find(end_match) {
+        Some(match_start) => {
+            match line[match_start + slen..].find(end_match) {
                 // a@@foo@@
-                Some(match_end) => {
-                    Some(Range { start: match_start+slen, end: match_end+match_start+slen })
-                }, 
-                None => None
+                Some(match_end) => Some(Range {
+                    start: match_start + slen,
+                    end: match_end + match_start + slen,
+                }),
+                None => None,
             }
-        },
-        None => None
+        }
+        None => None,
     }
 }
 pub enum ChangeString {
@@ -65,7 +66,13 @@ pub enum ChangeString {
 pub fn replace_line(vars: Vars, line: String) -> Result<ChangeString, ApplyError> {
     match match_line(line.as_str()) {
         Some(range) => {
-            debug!("slice {} {} {} {}", range.start, range.end, line, line.len());
+            debug!(
+                "slice {} {} {} {}",
+                range.start,
+                range.end,
+                line,
+                line.len()
+            );
             let key = &line[range.start..range.end];
             let mut new_line: String = String::new();
             let v = vars.get(key);
@@ -95,8 +102,8 @@ pub fn generate_recommended_file<'a, 'b>(
 ) -> Result<GenFile, ApplyError> {
     let gen = GenFile::new()?;
     let maybe_infile = template.open();
-    let infile = maybe_infile
-        .map_err(|e|ApplyError::FileReadError(format!("{:?} {:?}", template, e)))?;
+    let infile =
+        maybe_infile.map_err(|e| ApplyError::FileReadError(format!("{:?} {:?}", template, e)))?;
     let reader = BufReader::new(infile.file());
     let mut tmpfile = gen.open()?;
     for maybe_line in reader.lines() {

@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-use thiserror::Error;
 use ansi_term::Colour;
-use std::{ffi::OsString, fmt};
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
+use std::{ffi::OsString, fmt};
+use thiserror::Error;
 
 #[non_exhaustive]
 #[derive(Error, Debug)]
@@ -74,7 +74,7 @@ pub enum ApplyError {
     ExecError(String),
 
     #[error("No Parent Dir {0}")]
-    NoParent(String)
+    NoParent(String),
 }
 #[derive(Debug, Copy, Clone)]
 pub enum Verb {

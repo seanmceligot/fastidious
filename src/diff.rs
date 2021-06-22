@@ -1,11 +1,13 @@
+use crate::applyerr::Verb;
+use crate::fs::{can_create_dir, can_create_parent_dir, create_parent_dir};
+use ansi_term::Colour;
 use ansi_term::Colour::{Red, Yellow};
-use cmd::exectable_full_path;
-use applyerr::{ApplyError, color_from_verb};
 use applyerr::Verb::{LIVE, SKIPPED, WOULD};
-use fs::can_write_file;
-use userinput::ask;
+use applyerr::{color_from_verb, ApplyError};
+use cmd::exectable_full_path;
 use files::Mode;
 use files::{DestFile, GenFile, SrcFile};
+use fs::can_write_file;
 use log::debug;
 use log::trace;
 use std::path::Path;
@@ -13,9 +15,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::ExitStatus;
 use std::vec::IntoIter;
-use ansi_term::Colour;
-use crate::applyerr::Verb;
-use crate::fs::{can_create_dir, can_create_parent_dir, create_parent_dir};
+use userinput::ask;
 
 #[derive(Debug)]
 pub struct DiffText<'f> {
@@ -129,17 +129,11 @@ fn copy_active(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(),
     create_parent_dir(Mode::Active, dest.path())?;
     log_template_action("create from template", LIVE, template, gen, dest);
     match std::fs::copy(gen.path(), dest.path()) {
-        Err(e) => {
-            Err(ApplyError::CopyError(gen.path(), dest.path()))
-        }
+        Err(e) => Err(ApplyError::CopyError(gen.path(), dest.path())),
         Ok(_) => Ok(()),
     }
 }
-fn copy_interactive(
-    gen: &GenFile,
-    dest: &DestFile,
-    _template: &SrcFile,
-) -> Result<(), ApplyError> {
+fn copy_interactive(gen: &GenFile, dest: &DestFile, _template: &SrcFile) -> Result<(), ApplyError> {
     // TODO: add vimdiff support
     // TODO: use ask and copy_passive
     let status = Command::new("cp")
@@ -156,7 +150,11 @@ fn copy_interactive(
         panic!("cp failed: {:?} -> {:?}", gen, dest)
     }
 }
-fn merge_into_template(template: &SrcFile, _gen: &GenFile, dest: &DestFile) -> Result<bool,ApplyError> {
+fn merge_into_template(
+    template: &SrcFile,
+    _gen: &GenFile,
+    dest: &DestFile,
+) -> Result<bool, ApplyError> {
     let template_file = template.open()?;
     let status = Command::new("vim")
         .arg("-d")
