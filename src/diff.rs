@@ -122,6 +122,7 @@ pub fn update_from_template<'f>(
     }
 }
 fn create_passive(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(), ApplyError> {
+    info!("template {:?}", template);
     can_create_parent_dir(dest.path())?;
     can_create_parent_dir(gen.path())
 }
@@ -129,7 +130,7 @@ fn copy_active(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(),
     create_parent_dir(Mode::Active, dest.path())?;
     log_template_action("create from template", LIVE, template, gen, dest);
     match std::fs::copy(gen.path(), dest.path()) {
-        Err(e) => Err(ApplyError::CopyError(gen.path(), dest.path())),
+        Err(e) => Err(ApplyError::CopyError(gen.path(), dest.path(), e.to_string())),
         Ok(_) => Ok(()),
     }
 }

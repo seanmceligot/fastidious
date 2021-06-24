@@ -67,8 +67,8 @@ pub enum ApplyError {
     #[error("not a file {0}")]
     NotAFile(PathBuf),
 
-    #[error("Copy Error {0} {1}")]
-    CopyError(PathBuf, PathBuf),
+    #[error("Copy Error {0} {1} {2}")]
+    CopyError(PathBuf, PathBuf, String),
 
     #[error("Execute Error {0}")]
     ExecError(String),

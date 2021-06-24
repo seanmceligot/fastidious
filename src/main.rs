@@ -30,7 +30,6 @@ mod applyerr;
 use applyerr::ApplyError;
 mod apply;
 mod cmd;
-///mod action;
 mod configfile;
 mod diff;
 mod dryrun;
@@ -41,12 +40,12 @@ mod userinput;
 
 use apply::execute_apply;
 
-use crate::cmd::Script;
+use crate::cmd::VirtualFile;
 
 #[test]
 fn test_appply() -> Result<(), ApplyError> {
-    let apply_script = cmd::Script::InMemory(String::from("touch test1.tmp"));
-    let is_applied = cmd::Script::InMemory(String::from("test -f test1.tmp"));
+    let apply_script = cmd::in_memory_shell(String::from("touch test1.tmp"));
+    let is_applied = cmd::in_memory_shell(String::from("test -f test1.tmp"));
 
     let name_config: HashMap<String, String> = HashMap::new();
     do_is_applied(name_config.clone(), &is_applied)?;
@@ -160,7 +159,7 @@ fn lookup_is_applied_script(
     maybe_name: Option<&String>,
     name_config: &HashMap<String, String>,
     conf: &mut config::Config,
-) -> Result<Script, ApplyError> {
+) -> Result<VirtualFile, ApplyError> {
     let script_arg_name = "iscript";
     let script_param_name = "is_applied";
     let script_file_name = "is-applied";
@@ -180,7 +179,7 @@ fn lookup_apply_script(
     maybe_name: Option<&String>,
     name_config: &HashMap<String, String>,
     conf: &mut config::Config,
-) -> Result<Script, ApplyError> {
+) -> Result<VirtualFile, ApplyError> {
     let script_arg_name = "ascript";
     let script_param_name = "apply";
     let script_file_name = "apply";
@@ -203,17 +202,17 @@ fn lookup_script(
     script_param_name: &str,
     conf: &mut config::Config,
     script_file_name: &str,
-) -> Result<Script, ApplyError> {
+) -> Result<VirtualFile, ApplyError> {
     let maybe_iscript = c.string_flag(script_arg_name);
     debug!("maybe_iscript {:?}", maybe_iscript);
     let maybe_is_applied_script = match maybe_iscript {
-        Ok(s) => Ok(Script::InMemory(s)),
+        Ok(s) => Ok(VirtualFile::InMemory(s)),
         Err(_e) => match maybe_name {
             Some(name) => {
                 // check name_config for "is_applied"
                 match name_config.get(script_param_name) {
-                    Some(source) => Ok(cmd::Script::InMemory(source.clone())),
-                    None => Ok(cmd::Script::FsPath(configfile::find_scriptlet(
+                    Some(source) => Ok(cmd::VirtualFile::InMemory(source.clone())),
+                    None => Ok(cmd::VirtualFile::FsPath(configfile::find_scriptlet(
                         conf,
                         name,
                         script_file_name,
@@ -247,7 +246,7 @@ fn try_is_applied_action(c: &seahorse::Context) -> Result<(), ApplyError> {
 
 fn do_apply(
     name_config: HashMap<String, String>,
-    script_path: &cmd::Script,
+    script_path: &cmd::VirtualFile,
 ) -> Result<(), ApplyError> {
     debug!("do_apply params {:#?}", name_config);
     execute_apply(script_path, name_config);
@@ -256,7 +255,7 @@ fn do_apply(
 
 fn do_is_applied(
     name_config: HashMap<String, String>,
-    script: &cmd::Script,
+    script: &cmd::VirtualFile,
 ) -> Result<(), ApplyError> {
     debug!("do_is_applied params {:#?}", name_config);
     debug!("do_is_applied script {:?}", script);

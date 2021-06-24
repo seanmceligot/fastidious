@@ -138,3 +138,5 @@ create:
 	rm -vf template/out.config
 	$(MAKE) active	
 
+cleantmp:
+		rm *.tmp *.tmp.sh

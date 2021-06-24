@@ -8,7 +8,6 @@ use std::path::PathBuf;
 
 use crate::applyerr::ApplyError;
 use crate::cmd::OpenFileHolder;
-use crate::cmd::Script;
 use crate::cmd::VirtualFile;
 
 #[derive(Debug, Clone, Copy)]
@@ -54,8 +53,8 @@ pub struct GenFile {
 }
 impl GenFile {
     pub fn new() -> Result<GenFile, ApplyError> {
-        let path = PathBuf::from("tmp1.txt");
-        Ok(GenFile { path: path })
+        let path = PathBuf::from(format!("{}.gen.tmp", rand::random::<u32>()));
+        Ok(GenFile { path })
     }
     pub fn path(&self) -> PathBuf {
         self.path.clone()

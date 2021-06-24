@@ -15,7 +15,7 @@ use crate::{
     dryrun::{self, execute},
 };
 
-pub(crate) fn execute_apply(script: &cmd::Script, vars: Vars) -> bool {
+pub(crate) fn execute_apply(script: &cmd::VirtualFile, vars: Vars) -> bool {
     let args = Args::new();
     match dryrun::execute(crate::files::Mode::Active, script, args, &vars) {
         Ok(_) => {
@@ -28,7 +28,7 @@ pub(crate) fn execute_apply(script: &cmd::Script, vars: Vars) -> bool {
         }
     }
 }
-pub(crate) fn is_applied(script: &cmd::Script, vars: HashMap<String, String>) -> bool {
+pub(crate) fn is_applied(script: &cmd::VirtualFile, vars: HashMap<String, String>) -> bool {
     let args = Args::new();
     match execute(crate::files::Mode::Active, script, args, &vars) {
         Ok(_) => {

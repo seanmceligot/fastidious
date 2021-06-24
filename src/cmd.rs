@@ -36,15 +36,20 @@ fn test_virtual_file() -> Result<(), ApplyError> {
         .file()
         .read_to_string(&mut s)
         .map_err(|e| ApplyError::FileReadError(format!("{:?} {}", o.path(), e)))?;
-    debug!("src contains: {} {}", n, s);
+    debug!("src contains: size: {} file contents {}", n, s);
     assert_eq!(s, text);
     Ok(())
 }
 
 #[derive(Debug)]
-pub enum Script {
+pub enum VirtualFile {
     FsPath(PathBuf),
     InMemory(String),
+}
+pub fn in_memory_shell(script:String) -> VirtualFile {
+    let mut full_script = String::from("#! /bin/sh\n");
+    full_script.push_str(script.as_str());
+    VirtualFile::InMemory(full_script)
 }
 pub struct ExecutableFile {
     path: PathBuf,
@@ -72,16 +77,15 @@ impl ReadableFile {
     }
 }
 
-pub type VirtualFile = Script;
-impl Script {
+impl VirtualFile {
     pub fn as_executable(&self) -> Result<ExecutableFile, ApplyError> {
         match self {
-            Script::FsPath(p) => {
+            VirtualFile::FsPath(p) => {
                 fs::can_execute(p.clone())?;
                 Ok(ExecutableFile { path: p.clone() })
             }
-            Script::InMemory(source) => {
-                let path = PathBuf::from("tmp1.sh");
+            VirtualFile::InMemory(source) => {
+                let path = PathBuf::from(format!("{}.tmp.sh", rand::random::<u32>()));
                 debug!("contents: {}", source);
                 write_file(
                     OpenOptions::new()
@@ -98,12 +102,12 @@ impl Script {
     }
     pub fn as_readable(&self) -> Result<ReadableFile, ApplyError> {
         match self {
-            Script::FsPath(p) => {
+            VirtualFile::FsPath(p) => {
                 fs::can_read_file(p.clone())?;
                 Ok(ReadableFile { path: p.clone() })
             }
-            Script::InMemory(source) => {
-                let path = PathBuf::from("tmp2.txt");
+            VirtualFile::InMemory(source) => {
+                let path = PathBuf::from(format!("r{}.tmp", rand::random::<u32>()));
                 debug!("contents: {}", source);
                 write_file(
                     OpenOptions::new()
@@ -135,13 +139,13 @@ impl Script {
     }
     pub fn open(&self, options: &OpenOptions) -> Result<OpenFileHolder,ApplyError> {
             match self {
-            Script::FsPath(path) => {
+            VirtualFile::FsPath(path) => {
                 let f = OpenOptions::new().read(true).open(path)
                 .map_err(|e|
                     ApplyError::FileReadError(format!("read error {:?} {:?}", path, e)))?;
                 Ok(OpenFileHolder::Perm(f, path.to_path_buf()))
             },
-            Script::InMemory(source) => {
+            VirtualFile::InMemory(source) => {
 
                 let readf = options
                 .open(path.clone())
@@ -152,11 +156,11 @@ impl Script {
     }
 }
  */
-impl fmt::Display for Script {
+impl fmt::Display for VirtualFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Script::FsPath(p) => write!(f, "{:?}", p),
-            Script::InMemory(s) => write!(f, "{}", s),
+            VirtualFile::FsPath(p) => write!(f, "{:?}", p),
+            VirtualFile::InMemory(s) => write!(f, "{}", s),
         }
     }
 }
@@ -245,7 +249,7 @@ fn write_file(
 }
 
 /*
-pub(crate) fn execute_script(script: &Script,  vars: Vars) -> Result<(), ApplyError> {
+pub(crate) fn execute_script(script: &VirtualFile,  vars: Vars) -> Result<(), ApplyError> {
     do_action(crate::files::Mode::Passive, vars, Action::Execute(script.clone(), Vec::new()))
     //Ok(execute_script_file(script_file.path(), vars)?)
 }

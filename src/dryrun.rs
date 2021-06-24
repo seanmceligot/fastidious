@@ -25,11 +25,10 @@ use std::slice::Iter;
 use std::str;
 use template::{generate_recommended_file, replace_line, ChangeString};
 use userinput::ask;
-
+use cmd;
 use crate::cmd::Args;
-use crate::cmd::Script;
-use crate::cmd::Vars;
 use crate::cmd::VirtualFile;
+use crate::cmd::Vars;
 
 /*
 #[derive(Debug)]
@@ -66,7 +65,7 @@ pub(crate) fn print_usage(program: &str) {
 #[derive(Debug)]
 pub enum Action {
     Template(VirtualFile, String),
-    Execute(Script, Args),
+    Execute(VirtualFile, Args),
     Error(String),
     None,
 }
@@ -117,8 +116,8 @@ fn process_template_file<'t>(
 
 #[test]
 fn test_execute_active() -> Result<(), ApplyError> {
-    let always_true = Script::FsPath(PathBuf::from("/bin/true"));
-    let always_false = Script::FsPath(PathBuf::from("/bin/false"));
+    let always_true = VirtualFile::FsPath(PathBuf::from("/bin/true"));
+    let always_false = VirtualFile::FsPath(PathBuf::from("/bin/false"));
     execute_active(&always_true, Args::new(), &Vars::new())?;
     match execute_active(&always_false, Args::new(), &Vars::new()) {
         Err(e) => println!(
@@ -129,20 +128,20 @@ fn test_execute_active() -> Result<(), ApplyError> {
         _ => return Err(ApplyError::Error(String::from("OK not expected"))),
     }
     execute_active(
-        &Script::InMemory("#! /bin/bash\necho hello".into()),
+        &cmd::in_memory_shell("echo hello".into()),
         Args::new(),
         &Vars::new(),
     )?;
     Ok(())
 }
 
-fn execute_inactive(script: &Script, args: Args, vars: &Vars) -> Result<(), ApplyError> {
+fn execute_inactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
     //        let exe_path = exectable_full_path(cmd)?;
     let cli = format!("{:?} {} {:?}", vars, script, args);
     log_cmd_action("run", Verb::WOULD, cli);
     Ok(())
 }
-fn execute_active(script: &Script, args: Vec<String>, vars: &Vars) -> Result<(), ApplyError> {
+fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Result<(), ApplyError> {
     let o = script.as_executable()?;
     let mut ps = Command::new(o.path());
     debug!("execute_active {:?}", ps);
@@ -176,7 +175,7 @@ fn execute_active(script: &Script, args: Vec<String>, vars: &Vars) -> Result<(),
     }
 }
 
-fn execute_interactive(script: &Script, args: Args, vars: &Vars) -> Result<(), ApplyError> {
+fn execute_interactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
     match ask(&format!("run (y/n): {}", script)) {
         'n' => {
             println!("{} {}", Yellow.paint("WOULD: run "), script);
@@ -187,7 +186,7 @@ fn execute_interactive(script: &Script, args: Args, vars: &Vars) -> Result<(), A
     }
 }
 
-pub fn execute(mode: Mode, cmd: &Script, args: Args, vars: &Vars) -> Result<(), ApplyError> {
+pub fn execute(mode: Mode, cmd: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
     match mode {
         Mode::Interactive => execute_interactive(cmd, args, vars),
         Mode::Passive => execute_inactive(cmd, args, vars),
@@ -274,7 +273,7 @@ pub(crate) fn dryrun(mut input_list: Iter<String>, mode: Mode) -> Result<(), App
                 None => Action::Error("expected execute path".into()),
                 Some(cmd) => {
                     let exe = exectable_full_path(cmd)?;
-                    let script = Script::FsPath(exe);
+                    let script = VirtualFile::FsPath(exe);
                     let rest = input_list.map(|s| s.clone()).collect();
                     Action::Execute(script, rest)
                 }
