@@ -46,7 +46,7 @@ pub enum ApplyError {
     CommandNotFound(String),
 
     #[error("Expected argument: {0}")]
-    ExpectedArg(&'static str),
+    ExpectedArg(String),
 
     #[error("Expected argument: {0}")]
     UnExpectedArg(String),

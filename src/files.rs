@@ -22,8 +22,8 @@ pub struct SrcFile {
 }
 
 impl SrcFile {
-    pub fn new(path: VirtualFile) -> SrcFile {
-        SrcFile { path: path }
+    pub fn new(path: VirtualFile) -> Self {
+        Self { path }
     }
     pub fn open(&self) -> Result<OpenFileHolder, ApplyError> {
         trace!("SrcFile::open {:?}", self.path);
@@ -37,7 +37,7 @@ pub struct DestFile {
     path: PathBuf,
 }
 impl DestFile {
-    pub fn new(m: Mode, p: PathBuf) -> DestFile {
+    pub fn new(m: Mode, p: PathBuf) -> Self {
         DestFile { mode: m, path: p }
     }
     pub fn _exists(&self) -> bool {
@@ -52,9 +52,9 @@ pub struct GenFile {
     path: PathBuf,
 }
 impl GenFile {
-    pub fn new() -> Result<GenFile, ApplyError> {
+    pub fn new() -> Result<Self, ApplyError> {
         let path = PathBuf::from(format!("{}.gen.tmp", rand::random::<u32>()));
-        Ok(GenFile { path })
+        Ok(Self { path })
     }
     pub fn path(&self) -> PathBuf {
         self.path.clone()

@@ -46,11 +46,6 @@ pub enum VirtualFile {
     FsPath(PathBuf),
     InMemory(String),
 }
-pub fn in_memory_shell(script:String) -> VirtualFile {
-    let mut full_script = String::from("#! /bin/sh\n");
-    full_script.push_str(script.as_str());
-    VirtualFile::InMemory(full_script)
-}
 pub struct ExecutableFile {
     path: PathBuf,
 }
@@ -58,9 +53,6 @@ impl ExecutableFile {
     pub fn path(&self) -> PathBuf {
         self.path.clone()
     }
-}
-pub struct WriteableFile {
-    path: PathBuf,
 }
 pub struct ReadableFile {
     path: PathBuf,
@@ -78,6 +70,11 @@ impl ReadableFile {
 }
 
 impl VirtualFile {
+    pub(crate) fn in_memory_shell(script: String) -> Self {
+        let mut full_script = String::from("#! /bin/sh\n");
+        full_script.push_str(script.as_str());
+        Self::InMemory(full_script)
+    }
     pub fn as_executable(&self) -> Result<ExecutableFile, ApplyError> {
         match self {
             VirtualFile::FsPath(p) => {
@@ -166,19 +163,16 @@ impl fmt::Display for VirtualFile {
 }
 
 pub enum OpenFileHolder {
-    Temp(File, PathBuf),
     Perm(File, PathBuf),
 }
 impl OpenFileHolder {
     pub(crate) fn file(&self) -> &File {
         match self {
-            OpenFileHolder::Temp(f, _tf) => f,
             OpenFileHolder::Perm(f, _p) => f,
         }
     }
     pub(crate) fn path(&self) -> &PathBuf {
         match self {
-            OpenFileHolder::Temp(_f, p) => p,
             OpenFileHolder::Perm(_f, p) => p,
         }
     }

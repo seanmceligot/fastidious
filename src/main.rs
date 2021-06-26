@@ -44,8 +44,8 @@ use crate::cmd::VirtualFile;
 
 #[test]
 fn test_appply() -> Result<(), ApplyError> {
-    let apply_script = cmd::in_memory_shell(String::from("touch test1.tmp"));
-    let is_applied = cmd::in_memory_shell(String::from("test -f test1.tmp"));
+    let apply_script = VirtualFile::in_memory_shell(String::from("touch test1.tmp"));
+    let is_applied = VirtualFile::in_memory_shell(String::from("test -f test1.tmp"));
 
     let name_config: HashMap<String, String> = HashMap::new();
     do_is_applied(name_config.clone(), &is_applied)?;

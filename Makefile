@@ -38,7 +38,7 @@ d:
 ##### test groups ####
 interactive: interactive x_interactive
 
-tests: passive active x x_active active_env xvar a a2 i noargs
+tests: passive active x x_active active_env xvar a a2 i noargs data
 
 broken: f t_mkdir 
 
@@ -140,3 +140,6 @@ create:
 
 cleantmp:
 		rm *.tmp *.tmp.sh
+
+data:
+	cargo run -- dry --active v var Hello t data:=@@var@@= out
