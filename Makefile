@@ -38,11 +38,13 @@ d:
 ##### test groups ####
 interactive: interactive x_interactive
 
-tests: passive active x x_active active_env xvar a a2 i noargs data
+tests: passive active x x_active active_env xvar a a2 i noargs data stdout
 
 broken: f t_mkdir 
 
 notyet: unapply cmd apply_interactive apply_passive apply_interactive
+
+errs: err_no_command err_notset er_invalid_command err_novar err_noval err_t_deny
 
 ##### tests ####
 
@@ -89,7 +91,6 @@ fix:
 t_mkdir:
 	$(dryrun) --active t <(echo foo) /tmp/foo/deleteme
 
-errs: err_no_command err_notset er_invalid_command err_novar err_noval err_t_deny
 
 err_no_command: 
 	$(dryrun) x lls -l || true
@@ -143,3 +144,6 @@ cleantmp:
 
 data:
 	cargo run -- dry --active v var Hello t data:=@@var@@= out
+
+stdout:
+	cargo run -- dry --active v var Hello t data:=@@var@@= /dev/stdout

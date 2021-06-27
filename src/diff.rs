@@ -16,18 +16,38 @@ use std::process::Command;
 use std::process::ExitStatus;
 use std::vec::IntoIter;
 use userinput::ask;
+use std::fmt;
 
 #[derive(Debug)]
-pub struct DiffText<'f> {
-    pub text: &'f IntoIter<u8>,
+pub enum DiffText {
+    Text(Vec<u8>),
+    Unsupported
 }
 
 #[derive(Debug)]
 pub enum DiffStatus {
     NoChanges,
     NewFile,
-    Changed(IntoIter<u8>),
+    Changed(DiffText),
+    Unsupported,
     Failed,
+}
+impl fmt::Display for DiffText {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DiffText::Text(difftext) => {
+                for u in difftext.iter() {
+                    let ch = *u as char;
+                    write!(f, "{}", ch)?;
+                }
+            },
+            DiffText::Unsupported => {
+                    write!(f, "Unsupported")?;
+            }
+        }
+        Ok(())
+
+    }
 }
 
 pub fn log_template_action(
@@ -48,10 +68,11 @@ pub fn log_template_action(
     );
 }
 
-pub fn diff(path: PathBuf, path2: PathBuf) -> DiffStatus {
-    debug!("diff {} {}", path.display(), path2.display());
+pub fn diff<'a>(path: PathBuf, path2: PathBuf) -> DiffStatus {
     if !path2.exists() {
         DiffStatus::NewFile
+    } else if !path2.is_file() {
+        DiffStatus::Unsupported
     } else {
         let output = Command::new("diff")
             .arg(path)
@@ -60,7 +81,7 @@ pub fn diff(path: PathBuf, path2: PathBuf) -> DiffStatus {
             .expect("diff failed");
         //io::stdout().write_all(&output.stdout).unwrap();
         match output.status.code().unwrap() {
-            1 => DiffStatus::Changed(output.stdout.into_iter()),
+            1 => DiffStatus::Changed(DiffText::Text(output.stdout.clone())),
             2 => DiffStatus::Failed,
             0 => DiffStatus::NoChanges,
             _ => DiffStatus::Failed,
@@ -114,6 +135,11 @@ pub fn update_from_template<'f>(
                 Mode::Interactive => copy_interactive(gen, dest, template),
             }
         }
+        DiffStatus::Unsupported => match mode {
+            Mode::Passive => update_from_template_passive(DiffText::Unsupported, template, gen, dest),
+            Mode::Active => update_from_template_active(template, gen, dest),
+            Mode::Interactive => update_from_template_interactive(DiffText::Unsupported, template, gen, dest),
+        },
         DiffStatus::Changed(difftext) => match mode {
             Mode::Passive => update_from_template_passive(difftext, template, gen, dest),
             Mode::Active => update_from_template_active(template, gen, dest),
@@ -189,15 +215,13 @@ fn merge_to_template_interactive(
 }
 
 fn update_from_template_passive(
-    difftext: std::vec::IntoIter<u8>,
+    difftext: DiffText,
     template: &SrcFile,
     gen: &GenFile,
     dest: &DestFile,
 ) -> Result<(), ApplyError> {
     log_template_action("create from template", WOULD, template, gen, dest);
-    for ch in difftext {
-        print!("{}", ch as char)
-    }
+    println!("{}", difftext);
     Ok(())
 }
 fn update_from_template_active(
@@ -208,7 +232,7 @@ fn update_from_template_active(
     copy_active(gen, dest, template)
 }
 fn update_from_template_interactive(
-    difftext: std::vec::IntoIter<u8>,
+    difftext: DiffText,
     template: &SrcFile,
     gen: &GenFile,
     dest: &DestFile,

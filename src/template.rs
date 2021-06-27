@@ -19,40 +19,47 @@ fn test_match_line() {
     let s2 = "@@foo@@a";
     let s3 = "@@foo@@";
     match match_line(s1) {
-        Some(r) => {
+        Some((r, outer)) => {
             assert_eq!(r.start, 3);
             assert_eq!(r.end, 6);
-            assert_eq!(s1[r.start..r.end], *"foo");
+            assert_eq!(extract_range(&s1, r), "foo");
         }
         None => panic!("expected Template"),
     }
     match match_line(s2) {
-        Some(r) => {
+        Some((r, outer)) => {
             assert_eq!(r.start, 2);
             assert_eq!(r.end, 5);
-            assert_eq!(s2[r.start..r.end], *"foo");
+            assert_eq!(extract_range(s2, r), "foo");
+            assert_eq!(extract_range(s2, outer), "@@foo@@");
         }
         None => panic!("expected Template"),
     }
     match match_line(s3) {
-        Some(r) => {
-            assert_eq!(s3[r.start..r.end], *"foo");
+        Some((r, outer)) => {
+            assert_eq!(extract_range(s3, r), "foo");
         }
         None => panic!("expected Template"),
     }
 }
-fn match_line<'a>(line: &'a str) -> Option<Range<usize>> {
-    let start_match = "@@";
-    let slen = start_match.len();
-    let end_match = "@@";
-    match line.find(start_match) {
-        Some(match_start) => {
-            match line[match_start + slen..].find(end_match) {
-                // a@@foo@@
-                Some(match_end) => Some(Range {
-                    start: match_start + slen,
-                    end: match_end + match_start + slen,
-                }),
+fn extract_range<'a>(s: &'a str, r: Range<usize>) -> &'a str {
+    &s[r.start..r.end]
+}
+fn match_line<'a>(line: &'a str) -> Option<(Range<usize>,Range<usize>)> {
+    let left_delim = "@@";
+    let left_delim_len = left_delim.len();
+    let right_delim = "@@";
+    let right_delim_len = right_delim.len();
+    match line.find(left_delim) {
+        Some(start_of_left_delim) => {
+            match line[start_of_left_delim + left_delim_len..].find(right_delim) {
+                Some(start_of_right_delim) => Some((Range {
+                    start: start_of_left_delim + left_delim_len,
+                    end: start_of_right_delim + start_of_left_delim + left_delim_len,
+                },Range {
+                    start: start_of_left_delim,
+                    end: start_of_right_delim + start_of_left_delim + right_delim_len + left_delim_len,
+                })),
                 None => None,
             }
         }
@@ -65,7 +72,7 @@ pub enum ChangeString {
 }
 pub fn replace_line(vars: Vars, line: String) -> Result<ChangeString, ApplyError> {
     match match_line(line.as_str()) {
-        Some(range) => {
+        Some((range, outer)) => {
             debug!(
                 "slice {} {} {} {}",
                 range.start,
@@ -74,19 +81,22 @@ pub fn replace_line(vars: Vars, line: String) -> Result<ChangeString, ApplyError
                 line.len()
             );
             let key = &line[range.start..range.end];
+            trace!("key {}", key);
             let mut new_line: String = String::new();
             let v = vars.get(key);
-            trace!("key {}", key);
             trace!("val {:?}", v);
             trace!("line {:?}", line);
-            let before: &str = &line[..range.start];
-            let after: &str = &line[range.end..];
+            let before: &str = &line[..outer.start];
+            let after: &str = &line[outer.end..];
+            trace!("before {}", before);
             new_line.push_str(before);
 
             if let Some(value) = v {
                 new_line.push_str(value);
                 new_line.push_str(after);
                 new_line.push('\n');
+                trace!("value {}", value);
+                trace!("after {}", after);
                 Ok(ChangeString::Changed(new_line))
             } else {
                 Err(ApplyError::VarNotFound(String::from(key)))
