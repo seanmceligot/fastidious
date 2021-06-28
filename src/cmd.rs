@@ -7,6 +7,7 @@ use ansi_term::Colour::{Green, Red, Yellow};
 use env_logger::Env;
 use seahorse::App;
 use std::fmt;
+use std::fs::canonicalize;
 use std::io::Read;
 use std::os::unix::prelude::OpenOptionsExt;
 use std::{
@@ -93,7 +94,8 @@ impl VirtualFile {
                     path.clone(),
                     source,
                 )?;
-                Ok(ExecutableFile { path: path.clone() })
+                let fullpath = canonicalize(path).unwrap();
+                Ok(ExecutableFile { path: fullpath })
             }
         }
     }

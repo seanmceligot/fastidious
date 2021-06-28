@@ -96,8 +96,8 @@ fn test_execute_active() -> Result<(), ApplyError> {
     match execute_active(&always_false, Args::new(), &Vars::new()) {
         Err(e) => println!(
             "{} {}",
-            Red.paint("/bin/false returned: "),
-            Red.paint(e.to_string())
+            Green.paint("/bin/false returned: "),
+            Green.paint(e.to_string())
         ),
         _ => return Err(ApplyError::Error(String::from("OK not expected"))),
     }
@@ -127,7 +127,7 @@ fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Resul
     }
     let output = ps
         .output()
-        .map_err(|e| ApplyError::ExecError(format!("{:?} {:?}", script, e)))?;
+        .map_err(|e| ApplyError::ExecError(format!("execute_active output: {:?} {:?} {:?}", o.path(), script, e)))?;
     println!("{} {}", Green.paint("LIVE: run "), format!("{}", script));
     io::stdout()
         .write_all(&output.stdout)
