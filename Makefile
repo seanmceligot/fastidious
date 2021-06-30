@@ -23,7 +23,6 @@ build:
 
 clean:
 	cargo clean
-	rm -rvf out
 
 update:
 	cargo build
@@ -49,7 +48,6 @@ errs: err_no_command err_notset er_invalid_command err_novar err_noval err_t_den
 ##### tests ####
 
 noargs: 
-	echo cp out1/myconfig project/myconfig
 	$(dryrun) 
 help:
 	$(dryrun) --help
@@ -95,7 +93,7 @@ t_mkdir:
 err_no_command: 
 	$(dryrun) x lls -l || true
 err_notset:
-	$(dryrun) --active v no_value fake_value t template/test.config template/out.config||true
+	$(dryrun) --active v no_value fake_value t 'data:key1 is @@key1@@' $@.out||true
 er_invalid_command:
 	${dryrun} foo ||true
 err_novar:
@@ -107,40 +105,40 @@ err_t_deny_mkdir:
 
 
 f:
-	$(dryrun) v key1 val1 f template/test.config template/upper.out /usr/bin/tr 'a-z' 'A-Z'
-	$(dryrun) --active v key1 val1 f template/test.config template/upper.out /usr/bin/tr 'a-z' 'A-Z'
+	$(dryrun) v key1 val1 f 'data:key1 is @@key1@@' 'data:key1 is @@key1@@' template/upper.out /usr/bin/tr 'a-z' 'A-Z'
+	$(dryrun) --active v key1 val1 f 'data:key1 is @@key1@@' template/upper.out /usr/bin/tr 'a-z' 'A-Z'
 passive:
-	$(dryrun) --active v value fake_value t template/test.config template/out.config
-	$(dryrun) v value real_value t template/test.config template/out.config
+	$(dryrun) --active v key1 fake_value t 'data:key1 is @@key1@@' $@.out
+	$(dryrun) v key1 real_value t 'data:key1 is @@key1@@' $@.out
+	diff -ZB $@.out <(echo key1 is fake_value)
 active:
-	$(dryrun) --active v value fake_value t template/test.config template/out.config
-	$(dryrun) --active v value real_value t template/test.config template/out.config
+	$(dryrun) --active v key1 fake_value t 'data:key1 is @@key1@@' $@.out
+	$(dryrun) --active v key1 real_value t 'data:key1 is @@key1@@' $@.out
+	diff -ZB $@.out <(echo key1 is real_value)
 interactive:
-	$(dryrun) --active v value fake_value t template/test.config template/out.config
-	$(dryrun) --interactive v value real_value t template/test.config template/out.config
+	$(dryrun) --active v key1 fake_value t 'data:key1 is @@key1@@' $@.out
+	$(dryrun) --interactive v key1 real_value t 'data:key1 is @@key1@@' $@.out
 
 x:
-	$(dryrun) --active v value fake_value t template/test.config template/out.config
-	$(dryrun) x chmod 600 template/out.config
+	$(dryrun) --active v key1 fake_value t 'data:key1 is @@key1@@' $@.out
+	$(dryrun) x chmod 600 $@.out
+	diff -ZB $@.out <(echo key1 is fake_value )
 x_active:
-	$(dryrun) --active v value fake_value t template/test.config template/out.config
-	$(dryrun) --active x chmod 600 template/out.config
+	$(dryrun) --active v key1 fake_value t 'data:key1 is @@key1@@' $@.out
+	$(dryrun) --active x chmod 600 $@.out
 
 active_env: DRYRUN_ACTIVE=1
 active_env:
 	$(dryrun) x ls -l Makefile
 
 x_interactive:
-	$(dryrun) --active v value fake_value t template/test.config template/out.config
-	$(dryrun) --interactive x chmod 600 template/out.config
+	$(dryrun) --active v key1 fake_value t 'data:key1 is @@key1@@' $@.out
+	$(dryrun) --interactive x chmod 600 $@.out
 xvar:
-	$(dryrun) v f template/out.config x chmod 600 @@f@@
-create:
-	rm -vf template/out.config
-	$(MAKE) active	
+	$(dryrun) v f $@.out x chmod 600 @@f@@
 
 cleantmp:
-		rm *.tmp *.tmp.sh
+		rm *.tmp *.tmp.sh *.out
 
 data:
 	cargo run -- dry --active v var Hello t data:=@@var@@= out

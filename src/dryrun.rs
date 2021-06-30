@@ -244,10 +244,14 @@ pub(crate) fn dryrun(input_list_vec: Iter<String>, mode: Mode) -> Result<(), App
                     debug!("exe {:?}", exe);
                     let script = VirtualFile::FsPath(exe);
                     let mut args = Args::new();
-                    for e in input_list.split_off(input_list.len()) {
-                        args.push(e.to_string());
+                    debug!("input_list {:?}", input_list); 
+                    for e in input_list.split_off(0) {
+                        let arg = e.to_string();
+                        debug!("arg {}", arg); 
+                        args.push(arg);
 
                     }
+                    debug!("input_list {:?}", input_list); 
                     debug!("args {:?}", args);
                     Action::Execute(script, args)
                 }

@@ -19,7 +19,7 @@ fn test_match_line() {
     let s2 = "@@foo@@a";
     let s3 = "@@foo@@";
     match match_line(s1) {
-        Some((r, outer)) => {
+        Some((r, _outer)) => {
             assert_eq!(r.start, 3);
             assert_eq!(r.end, 6);
             assert_eq!(extract_range(&s1, r), "foo");
@@ -36,7 +36,7 @@ fn test_match_line() {
         None => panic!("expected Template"),
     }
     match match_line(s3) {
-        Some((r, outer)) => {
+        Some((r, _outer)) => {
             assert_eq!(extract_range(s3, r), "foo");
         }
         None => panic!("expected Template"),
@@ -72,20 +72,18 @@ pub enum ChangeString {
 }
 pub fn replace_line(vars: Vars, line: String) -> Result<ChangeString, ApplyError> {
     match match_line(line.as_str()) {
-        Some((range, outer)) => {
-            debug!(
-                "slice {} {} {} {}",
-                range.start,
-                range.end,
-                line,
-                line.len()
-            );
-            let key = &line[range.start..range.end];
+        Some((inner, outer)) => {
+            debug!( "{}", line,);
+            debug!( "01234567890123456789012345678901234567890123456789012345678901234567890");
+            let key = &line[inner.start..inner.end];
             trace!("key {}", key);
             let mut new_line: String = String::new();
             let v = vars.get(key);
+            trace!("vars {:?}", vars);
             trace!("val {:?}", v);
             trace!("line {:?}", line);
+            trace!("inner {} {}", inner.start, inner.end);
+            trace!("outer {} {}", outer.start, outer.end);
             let before: &str = &line[..outer.start];
             let after: &str = &line[outer.end..];
             trace!("before {}", before);
