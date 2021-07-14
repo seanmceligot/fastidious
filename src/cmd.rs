@@ -198,39 +198,6 @@ fn exectable_full_path_which(
         Err(_e) => Err(ApplyError::CommandNotFound(String::from(prg))),
     }
 }
-pub(crate) fn _execute_script_file(cmdpath: &Path, vars: Vars) -> Result<(), ApplyError> {
-    let cmdstr = cmdpath.as_os_str();
-    debug!("run: {:#?}", cmdstr);
-    let output = Command::new("bash")
-        .arg(cmdstr)
-        .envs(vars)
-        .output()
-        .expect("cmd failed");
-    io::stdout()
-        .write_all(&output.stdout)
-        .expect("error writing to stdout");
-    match output.status.code() {
-        Some(n) => {
-            if n == 0 {
-                println!(
-                    "{} {}",
-                    Green.paint("status code: "),
-                    Green.paint(n.to_string())
-                );
-                Ok(())
-            } else {
-                println!(
-                    "{} {}",
-                    Red.paint("status code: "),
-                    Red.paint(n.to_string())
-                );
-                Err(ApplyError::NotZeroExit(n))
-            }
-        }
-        None => Err(ApplyError::CmdExitedPrematurely),
-    }
-}
-
 fn write_file(
     options: &mut OpenOptions,
     path: PathBuf,

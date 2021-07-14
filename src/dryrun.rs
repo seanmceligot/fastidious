@@ -150,9 +150,9 @@ fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Resul
 }
 
 fn execute_interactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
-    match ask(&format!("run (y/n): {}", script)) {
+    let strargs = args.join(" ");
+    match ask(&format!("run (y/n): {} {}", script, strargs)) {
         'n' => {
-            println!("{} {}", Yellow.paint("WOULD: run "), script);
             Ok(())
         }
         'y' => execute_active(script, args, &vars),
