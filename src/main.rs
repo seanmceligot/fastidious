@@ -219,10 +219,10 @@ fn lookup_script(
                     ))),
                 }
             }
-            None => Err(ApplyError::VarNotFound(String::from(format!(
+            None => Err(ApplyError::VarNotFound(format!(
                 "arg --{} or config {} or file {}",
                 script_arg_name, script_param_name, script_file_name
-            )))),
+            ))),
         },
     };
     maybe_is_applied_script
