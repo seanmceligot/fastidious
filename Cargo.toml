@@ -1,7 +1,7 @@
 [package]
-name = "noname"
-description = "apply, unapply, dryrun"
-version = "0.1.0"
+name = "inducer"
+description = "command line apply, unapply, is-applied, dryrun"
+version = "0.2.0"
 authors = ["Sean McEligot <sean.mceligot@gmail.com>"]
 
 [dependencies]
@@ -20,19 +20,11 @@ temp-file = "*"
 rand = "*"
 log = "0.4"
 simple_logger = "1.6.0"
-which = "*"
+which = "4.0.2"
 thiserror = "*"
 libc="*"
 
 [dev-dependencies]
 assert_cmd = "1.0.1"
 predicates = "1.0.0"
-
-#[lib]
-#name = "dryrun"
-#path = "src/lib.rs"
-
-#[[bin]]
-#name = "do"
-#path = "src/main.rs"
 
