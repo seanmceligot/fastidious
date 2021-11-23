@@ -75,6 +75,9 @@ pub enum ApplyError {
 
     #[error("No Parent Dir {0}")]
     NoParent(String),
+    
+    #[error("Script Error {0} {}")]
+    ScriptError(String),
 }
 #[derive(Debug, Copy, Clone)]
 pub enum Verb {

@@ -15,15 +15,15 @@ use crate::{
     dryrun::{self, execute},
 };
 
-pub(crate) fn execute_apply(script: &cmd::VirtualFile, vars: Vars) -> bool {
+pub(crate) fn execute_apply(script: &cmd::VirtualFile, vars: Vars, mode: crate::files::Mode) -> bool {
     let args = Args::new();
-    match dryrun::execute(crate::files::Mode::Active, script, args, &vars) {
+    match dryrun::execute(mode, script, args, &vars) {
         Ok(_) => {
             println!("{}", Green.paint("Applied"));
             true
         }
-        Err(_e) => {
-            println!("{}", Yellow.paint("Apply Failed"));
+        Err(e) => {
+            println!("{} {:?}", Yellow.paint("Apply Failed"), e);
             false
         }
     }

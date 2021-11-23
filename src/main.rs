@@ -49,7 +49,7 @@ fn test_appply() -> Result<(), ApplyError> {
 
     let name_config: HashMap<String, String> = HashMap::new();
     do_is_applied(name_config.clone(), &is_applied)?;
-    do_apply(name_config, &apply_script)?;
+    do_apply(name_config, &apply_script, files::Mode::Active)?;
     Ok(())
 }
 
@@ -58,7 +58,7 @@ fn main1() -> Result<(), ApplyError> {
     env_logger::init();
     let args: Vec<String> = env::args().collect();
 
-    let dry_command = seahorse::Command::new("dry")
+    let dry_command = seahorse::Command::new("dryrun")
         .description("dryrun [name]")
         .alias("d")
         .action(dry_action)
@@ -71,8 +71,8 @@ fn main1() -> Result<(), ApplyError> {
         .action(apply_action)
         .flag(Flag::new("active", FlagType::Bool).alias("A"))
         .flag(Flag::new("interactive", FlagType::Bool).alias("I"))
-        .flag(Flag::new("iscript", FlagType::String).alias("P"))
-        .flag(Flag::new("ascript", FlagType::String).alias("Z"))
+        .flag(Flag::new("ifnot", FlagType::String).alias("P"))
+        .flag(Flag::new("then", FlagType::String).alias("Z"))
         .flag(Flag::new("var", FlagType::String).alias("V"));
 
     // use apply::execute_apply;
@@ -80,7 +80,7 @@ fn main1() -> Result<(), ApplyError> {
         .description("is_applied [name] if not already applied")
         .alias("i")
         .action(is_applied_action)
-        .flag(Flag::new("iscript", FlagType::String).alias("P"));
+        .flag(Flag::new("ifnot", FlagType::String).alias("P"));
 
     let app = seahorse::App::new(env!("CARGO_PKG_NAME"))
         .description(env!("CARGO_PKG_DESCRIPTION"))
@@ -94,24 +94,26 @@ fn main1() -> Result<(), ApplyError> {
 
     Ok(())
 }
+fn get_mode(c: &seahorse::Context) -> files::Mode {
+    if c.bool_flag("active") {
+        files::Mode::Active
+    } else if c.bool_flag("interactive") {
+        files::Mode::Interactive
+    } else {
+        files::Mode::Passive
+    }
+}
 fn dry_action(c: &seahorse::Context) {
     debug!("dry_action");
     if c.args.is_empty() {
-        dryrun::print_usage("noname dry COMMAND");
+        dryrun::print_usage("noname dryrun COMMAND");
         return;
     }
     if let Some(name) = c.args.first() {
         debug!("dry_action {}", name);
     }
 
-    let mut mode = files::Mode::Passive;
-    if c.bool_flag("active") {
-        mode = files::Mode::Active;
-    }
-    if c.bool_flag("interactive") {
-        mode = files::Mode::Interactive;
-    }
-
+    let mode = get_mode(c);
     match dryrun::dryrun(c.args.iter(), mode) {
         Ok(_) => {}
         Err(e) => {
@@ -127,14 +129,17 @@ fn apply_action(c: &seahorse::Context) {
 }
 fn is_applied_action(c: &seahorse::Context) {
     match try_is_applied_action(c) {
-        Ok(_) => (),
-        Err(e) => error!("{:?}", e),
+        Ok(is) => {
+            if !is {
+                panic!("not applied")
+            }
+        },
+        Err(e) => panic!("{:?}", e),
     }
 }
 fn try_apply_action(c: &seahorse::Context) -> Result<(), ApplyError> {
     debug!("apply_action");
     let maybe_name = c.args.first();
-
     let c1 = &mut config::Config::default();
     let conf = configfile::load_config(c1).map_err(|e| ApplyError::ConfigError(e.to_string()))?;
 
@@ -146,12 +151,22 @@ fn try_apply_action(c: &seahorse::Context) -> Result<(), ApplyError> {
     let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, conf);
     let is_applied_script = maybe_is_applied_script?;
 
-    do_is_applied(name_config.clone(), &is_applied_script).unwrap();
 
-    let maybe_apply_script = lookup_apply_script(c, maybe_name, &name_config, conf);
-    let apply_script = maybe_apply_script.unwrap();
+    let is = do_is_applied(name_config.clone(), &is_applied_script)
+            .map_err(|e| {
+                ApplyError::ScriptError(format!("script error {:?} {:?}", is_applied_script, e))
+            })?;
 
-    do_apply(name_config, &apply_script)
+    if is {
+        debug!("already applied");
+        Ok(())
+    } else {
+        let maybe_apply_script = lookup_apply_script(c, maybe_name, &name_config, conf);
+        let apply_script = maybe_apply_script.unwrap();
+
+        let mode = get_mode(c);
+        do_apply(name_config, &apply_script, mode)
+    }
 }
 
 fn lookup_is_applied_script(
@@ -160,7 +175,7 @@ fn lookup_is_applied_script(
     name_config: &HashMap<String, String>,
     conf: &mut config::Config,
 ) -> Result<VirtualFile, ApplyError> {
-    let script_arg_name = "iscript";
+    let script_arg_name = "ifnot";
     let script_param_name = "is_applied";
     let script_file_name = "is-applied";
 
@@ -180,7 +195,7 @@ fn lookup_apply_script(
     name_config: &HashMap<String, String>,
     conf: &mut config::Config,
 ) -> Result<VirtualFile, ApplyError> {
-    let script_arg_name = "ascript";
+    let script_arg_name = "then";
     let script_param_name = "apply";
     let script_file_name = "apply";
 
@@ -203,15 +218,15 @@ fn lookup_script(
     conf: &mut config::Config,
     script_file_name: &str,
 ) -> Result<VirtualFile, ApplyError> {
-    let maybe_iscript = c.string_flag(script_arg_name);
-    debug!("maybe_iscript {:?}", maybe_iscript);
-    let maybe_is_applied_script = match maybe_iscript {
-        Ok(s) => Ok(VirtualFile::InMemory(s)),
+    let maybe_ifnot = c.string_flag(script_arg_name);
+    debug!("maybe_ifnot {:?}", maybe_ifnot);
+    let maybe_is_applied_script = match maybe_ifnot {
+        Ok(s) => Ok(VirtualFile::in_memory_shell(s)),
         Err(_e) => match maybe_name {
             Some(name) => {
                 // check name_config for "is_applied"
                 match name_config.get(script_param_name) {
-                    Some(source) => Ok(cmd::VirtualFile::InMemory(source.clone())),
+                    Some(source) => Ok(cmd::VirtualFile::in_memory_shell(source.clone())),
                     None => Ok(cmd::VirtualFile::FsPath(configfile::find_scriptlet(
                         conf,
                         name,
@@ -227,7 +242,7 @@ fn lookup_script(
     };
     maybe_is_applied_script
 }
-fn try_is_applied_action(c: &seahorse::Context) -> Result<(), ApplyError> {
+fn try_is_applied_action(c: &seahorse::Context) -> Result<bool, ApplyError> {
     println!("is_applied_action");
     let maybe_name = c.args.first();
     let c1 = &mut config::Config::default();
@@ -241,27 +256,27 @@ fn try_is_applied_action(c: &seahorse::Context) -> Result<(), ApplyError> {
     let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, conf);
     let is_applied_script = maybe_is_applied_script?;
 
-    do_is_applied(name_config, &is_applied_script)
+    do_is_applied(name_config.clone(), &is_applied_script)
+     
 }
 
 fn do_apply(
     name_config: HashMap<String, String>,
     script_path: &cmd::VirtualFile,
+    mode: files::Mode
 ) -> Result<(), ApplyError> {
-    debug!("do_apply params {:#?}", name_config);
-    execute_apply(script_path, name_config);
+    debug!("do_apply params {:#?} {:?}", name_config, mode);
+    execute_apply(script_path, name_config, mode);
     Ok(())
 }
 
 fn do_is_applied(
     name_config: HashMap<String, String>,
     script: &cmd::VirtualFile,
-) -> Result<(), ApplyError> {
+) -> Result<bool, ApplyError> {
     debug!("do_is_applied params {:#?}", name_config);
     debug!("do_is_applied script {:?}", script);
-    apply::is_applied(&script, name_config);
-    // TODO: return Delta >= 0
-    Ok(())
+    Ok( apply::is_applied(&script, name_config))
 }
 
 fn main() {

@@ -42,9 +42,6 @@ fn test_match_line() {
         None => panic!("expected Template"),
     }
 }
-fn extract_range<'a>(s: &'a str, r: Range<usize>) -> &'a str {
-    &s[r.start..r.end]
-}
 fn match_line<'a>(line: &'a str) -> Option<(Range<usize>,Range<usize>)> {
     let left_delim = "@@";
     let left_delim_len = left_delim.len();

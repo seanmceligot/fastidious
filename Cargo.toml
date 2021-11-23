@@ -1,5 +1,5 @@
 [package]
-name = "inducer"
+name = "fastidious"
 description = "command line apply, unapply, is-applied, dryrun"
 version = "0.2.0"
 authors = ["Sean McEligot <sean.mceligot@gmail.com>"]

@@ -59,24 +59,24 @@ unapply:
 	cargo run -- unapply example1 
 
 apply_with_var: 
-	cargo run -- apply --iscript 'test -f mysecret' --ascript 'echo {{SECRET}} > mysecret'
-	diff <(echo '') mysecret
+	cargo run -- apply --ifnot 'test -f myfile.config' --then 'echo key=value > myfile.config'
+	diff <(echo '') myfile.config
 
 apply_passive: 
-	rm -v mysecret
-	cargo run -- apply --passive --iscript 'test -f mysecret' --ascript 'echo {{SECRET}} > mysecret'
-	diff <(echo '') mysecret
+	rm -v myfile.config
+	cargo run -- apply --passive --ifnot 'test -f myfile.config' --then 'echo key=value > myfile.config'
+	diff <(echo '') myfile.config
 apply_active: 
-	rm -v mysecret
-	cargo run --active apply --interactive --iscript 'test -f mysecret' --ascript 'echo {{SECRET}} > mysecret'
-	diff <(echo 'mypassword') mysecret
+	rm -vf myfile.config
+	cargo run --active apply --interactive --ifnot 'test -f myfile.config' --then 'echo key=value > myfile.config'
+	diff <(echo 'key=value') myfile.config
 apply_interactive: 
-	rm -v mysecret
-	cargo run -- apply --interactive --iscript 'test -f mysecret' --ascript 'echo {{SECRET}} > mysecret'
-	diff <(echo '') mysecret
+	rm -vf myfile.config
+	cargo run -- apply --interactive --ifnot 'test -f myfile.config' --then 'echo key=value > myfile.config'
+	diff <(echo 'key=value') myfile.config
 
 a2: 
-	cargo run -- apply --iscript 'test -f foo' --ascript 'touch foo'
+	cargo run -- apply --ifnot 'test -f foo' --then 'touch foo'
 a:
 	cargo run -- apply example1 
 
