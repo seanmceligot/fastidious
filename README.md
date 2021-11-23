@@ -1,4 +1,6 @@
-```
+Test and apply if not already applied
+
+```console
 fastidious apply --interactive --ifnot 'test -f hello.sh' --then 'echo -e "#!/bin/sh\necho hello"> hello.sh'
 test -f hello.sh
 Unapplied
@@ -9,8 +11,11 @@ y
 echo -e "#!/bin/sh\necho hello"> hello.sh
 status code:  0
 Applied
+```
 
+Make executable if not already
 
+```console
 fastidious apply --interactive --ifnot 'test -x hello.sh' --then 'chmod 755 hello.sh'
 LIVE: run  #! /bin/sh
 test -x hello.sh
@@ -24,14 +29,21 @@ LIVE: run  #! /bin/sh
 chmod 755 hello.sh
 status code:  0
 Applied
+```
 
+Does nothing because hello.sh already exists
+
+```console
 fastidious apply --interactive --ifnot 'test -f hello.sh' --then 'echo -e "#!/bin/sh\necho hello"> hello.sh'
 LIVE: run  #! /bin/sh
 test -f hello.sh
 status code:  0
 Applied
+```
 
+Ask before running
 
+```console
 fastidious dryrun --interactive x ./hello.sh
 run (y/n): "/home/sean/git/rust/fastidous/./hello.sh"
 y
@@ -40,3 +52,14 @@ hello
 status code:  0
 Script done.
 ```
+
+Arguments
+=========
+
+- --interactive : ask before executing command
+- --passive : check permissions and print what would be run
+- --active : run without asking
+- apply --ifnot <script> --then <script>
+- is-applied <script>
+- x cmd arg...: run command
+- var key value : set variable
