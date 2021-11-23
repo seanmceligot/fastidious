@@ -15,6 +15,9 @@ use crate::cmd::Vars;
 
 #[test]
 fn test_match_line() {
+    fn extract_range<'a>(s: &'a str, r: Range<usize>) -> &'a str {
+        &s[r.start..r.end]
+    }
     let s1 = "a@@foo@@";
     let s2 = "@@foo@@a";
     let s3 = "@@foo@@";
