@@ -33,12 +33,11 @@ impl SrcFile {
 
 #[derive(Debug)]
 pub struct DestFile {
-    mode: Mode,
     path: PathBuf,
 }
 impl DestFile {
-    pub fn new(m: Mode, p: PathBuf) -> Self {
-        DestFile { mode: m, path: p }
+    pub fn new(p: PathBuf) -> Self {
+        DestFile { path: p }
     }
     pub fn _exists(&self) -> bool {
         self.path.exists()

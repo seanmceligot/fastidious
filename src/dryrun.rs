@@ -175,7 +175,7 @@ pub fn do_action<'g>(mode: Mode, vars: Vars, action: Action) -> Result<(), Apply
     match action {
         Action::Template(template_file_name, output_file_name) => {
             let template_file = SrcFile::new(template_file_name);
-            let output_file = DestFile::new(mode, PathBuf::from(output_file_name));
+            let output_file = DestFile::new(PathBuf::from(output_file_name));
             process_template_file(mode, vars, &template_file, &output_file).map(|_diff_status| ())
         }
         Action::Execute(cmd, args) => {
