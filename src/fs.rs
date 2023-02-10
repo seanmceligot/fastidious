@@ -90,7 +90,8 @@ pub fn can_write_to_parent_dir(path: PathBuf) -> Result<(), ApplyError> {
         Some(dir) => can_write_dir(dir.to_path_buf()),
         None => {
             // relative, use current_dir
-            let pwd = env::current_dir().map_err(|e| ApplyError::PathNotFound(format!("current dir {:?}", e)))?;
+            let pwd = env::current_dir()
+                .map_err(|e| ApplyError::PathNotFound(format!("current dir {:?}", e)))?;
             can_write_dir(pwd)
         }
     }

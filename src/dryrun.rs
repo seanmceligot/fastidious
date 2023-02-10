@@ -1,3 +1,7 @@
+use crate::cmd::Args;
+use crate::cmd::Vars;
+use crate::cmd::VirtualFile;
+use crate::files::Mode;
 use ansi_term::Colour::{Green, Red, Yellow};
 use applyerr::log_cmd_action;
 use applyerr::ApplyError;
@@ -24,10 +28,6 @@ use std::slice::Iter;
 use std::str;
 use template::{generate_recommended_file, replace_line, ChangeString};
 use userinput::ask;
-use crate::cmd::Args;
-use crate::cmd::VirtualFile;
-use crate::cmd::Vars;
-use crate::files::Mode;
 
 pub(crate) fn print_usage(program: &str) {
     println!("{}", program);
@@ -125,9 +125,14 @@ fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Resul
     if vars.len() > 0 {
         ps.envs(vars);
     }
-    let output = ps
-        .output()
-        .map_err(|e| ApplyError::ExecError(format!("execute_active output: {:?} {:?} {:?}", o.path(), script, e)))?;
+    let output = ps.output().map_err(|e| {
+        ApplyError::ExecError(format!(
+            "execute_active output: {:?} {:?} {:?}",
+            o.path(),
+            script,
+            e
+        ))
+    })?;
     println!("{} {}", Green.paint("LIVE: run "), format!("{}", script));
     io::stdout()
         .write_all(&output.stdout)
@@ -152,9 +157,7 @@ fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Resul
 fn execute_interactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
     let strargs = args.join(" ");
     match ask(&format!("run (y/n): {} {}", script, strargs)) {
-        'n' => {
-            Ok(())
-        }
+        'n' => Ok(()),
         'y' => execute_active(script, args, &vars),
         _ => execute_interactive(script, args, vars),
     }
@@ -231,12 +234,12 @@ pub(crate) fn dryrun(input_list_vec: Iter<String>, mode: Mode) -> Result<(), App
                         debug!("v {}", v);
                         Action::None
                     } else {
-                        Action::Error(ApplyError::ExpectedArg( format!("value for {}", k)))
+                        Action::Error(ApplyError::ExpectedArg(format!("value for {}", k)))
                     }
                 } else {
                     Action::Error(ApplyError::ExpectedArg("key".into()))
                 }
-            },
+            }
             Type::Execute => match input_list.pop_front() {
                 None => Action::Error(ApplyError::ExpectedArg("expected execute path".into())),
                 Some(cmd) => {
@@ -244,21 +247,20 @@ pub(crate) fn dryrun(input_list_vec: Iter<String>, mode: Mode) -> Result<(), App
                     debug!("exe {:?}", exe);
                     let script = VirtualFile::FsPath(exe);
                     let mut args = Args::new();
-                    debug!("input_list {:?}", input_list); 
+                    debug!("input_list {:?}", input_list);
                     for e in input_list.split_off(0) {
                         let arg = e.to_string();
-                        debug!("arg {}", arg); 
+                        debug!("arg {}", arg);
                         args.push(arg);
-
                     }
-                    debug!("input_list {:?}", input_list); 
+                    debug!("input_list {:?}", input_list);
                     debug!("args {:?}", args);
                     Action::Execute(script, args)
                 }
             },
             Type::Unknown => {
                 println!("{} {}", Red.paint("Unknown type:"), Red.paint(input));
-                Action::Error( ApplyError::ExpectedArg( format!("Unknown type: {}", input)))
+                Action::Error(ApplyError::ExpectedArg(format!("Unknown type: {}", input)))
             }
         };
         //debug!("vars {:#?}", &vars);

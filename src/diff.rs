@@ -10,18 +10,18 @@ use files::{DestFile, GenFile, SrcFile};
 use fs::can_write_file;
 use log::debug;
 use log::trace;
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::ExitStatus;
 use std::vec::IntoIter;
 use userinput::ask;
-use std::fmt;
 
 #[derive(Debug)]
 pub enum DiffText {
     Text(Vec<u8>),
-    Unsupported
+    Unsupported,
 }
 
 #[derive(Debug)]
@@ -40,13 +40,12 @@ impl fmt::Display for DiffText {
                     let ch = *u as char;
                     write!(f, "{}", ch)?;
                 }
-            },
+            }
             DiffText::Unsupported => {
-                    write!(f, "Unsupported")?;
+                write!(f, "Unsupported")?;
             }
         }
         Ok(())
-
     }
 }
 
@@ -136,9 +135,13 @@ pub fn update_from_template<'f>(
             }
         }
         DiffStatus::Unsupported => match mode {
-            Mode::Passive => update_from_template_passive(DiffText::Unsupported, template, gen, dest),
+            Mode::Passive => {
+                update_from_template_passive(DiffText::Unsupported, template, gen, dest)
+            }
             Mode::Active => update_from_template_active(template, gen, dest),
-            Mode::Interactive => update_from_template_interactive(DiffText::Unsupported, template, gen, dest),
+            Mode::Interactive => {
+                update_from_template_interactive(DiffText::Unsupported, template, gen, dest)
+            }
         },
         DiffStatus::Changed(difftext) => match mode {
             Mode::Passive => update_from_template_passive(difftext, template, gen, dest),
@@ -156,7 +159,11 @@ fn copy_active(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(),
     create_parent_dir(Mode::Active, dest.path())?;
     log_template_action("create from template", LIVE, template, gen, dest);
     match std::fs::copy(gen.path(), dest.path()) {
-        Err(e) => Err(ApplyError::CopyError(gen.path(), dest.path(), e.to_string())),
+        Err(e) => Err(ApplyError::CopyError(
+            gen.path(),
+            dest.path(),
+            e.to_string(),
+        )),
         Ok(_) => Ok(()),
     }
 }

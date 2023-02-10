@@ -45,7 +45,7 @@ fn test_match_line() {
         None => panic!("expected Template"),
     }
 }
-fn match_line<'a>(line: &'a str) -> Option<(Range<usize>,Range<usize>)> {
+fn match_line<'a>(line: &'a str) -> Option<(Range<usize>, Range<usize>)> {
     let left_delim = "@@";
     let left_delim_len = left_delim.len();
     let right_delim = "@@";
@@ -53,13 +53,19 @@ fn match_line<'a>(line: &'a str) -> Option<(Range<usize>,Range<usize>)> {
     match line.find(left_delim) {
         Some(start_of_left_delim) => {
             match line[start_of_left_delim + left_delim_len..].find(right_delim) {
-                Some(start_of_right_delim) => Some((Range {
-                    start: start_of_left_delim + left_delim_len,
-                    end: start_of_right_delim + start_of_left_delim + left_delim_len,
-                },Range {
-                    start: start_of_left_delim,
-                    end: start_of_right_delim + start_of_left_delim + right_delim_len + left_delim_len,
-                })),
+                Some(start_of_right_delim) => Some((
+                    Range {
+                        start: start_of_left_delim + left_delim_len,
+                        end: start_of_right_delim + start_of_left_delim + left_delim_len,
+                    },
+                    Range {
+                        start: start_of_left_delim,
+                        end: start_of_right_delim
+                            + start_of_left_delim
+                            + right_delim_len
+                            + left_delim_len,
+                    },
+                )),
                 None => None,
             }
         }
@@ -73,8 +79,8 @@ pub enum ChangeString {
 pub fn replace_line(vars: Vars, line: String) -> Result<ChangeString, ApplyError> {
     match match_line(line.as_str()) {
         Some((inner, outer)) => {
-            debug!( "{}", line,);
-            debug!( "01234567890123456789012345678901234567890123456789012345678901234567890");
+            debug!("{}", line,);
+            debug!("01234567890123456789012345678901234567890123456789012345678901234567890");
             let key = &line[inner.start..inner.end];
             trace!("key {}", key);
             let mut new_line: String = String::new();
