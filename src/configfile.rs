@@ -1,16 +1,11 @@
-use config::Config;
-
+use config::builder::{BuilderState, ConfigBuilder, DefaultState};
+use config::{Config, ConfigError};
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::applyerr::ApplyError;
 
-pub(crate) fn load_config(c1: &mut Config) -> Result<&mut Config, config::ConfigError> {
-    let c2 = c1.merge(config::Environment::with_prefix("NONAME"))?;
-    c2.merge(config::File::with_name("noname").required(false))
-}
-
-fn get_script_directory(conf: &mut Config) -> PathBuf {
-    let script_dir = match conf.get_str("script_dir") {
+fn get_script_directory(conf: &Config) -> PathBuf {
+    let script_dir = match conf.get_string("script_dir") {
         Ok(val) => PathBuf::from(val),
         Err(_) => dirs::home_dir().unwrap_or_else(|| std::env::current_dir().unwrap()),
     };
@@ -21,7 +16,7 @@ fn get_script_directory(conf: &mut Config) -> PathBuf {
     }
     script_path
 }
-pub(crate) fn find_scriptlet(conf: &mut Config, name: &str, action: &str) -> PathBuf {
+pub(crate) fn find_scriptlet(conf: &Config, name: &str, action: &str) -> PathBuf {
     let filename = format!("{}-{}", name, action);
     debug!("script filename {}", filename);
     let dir = get_script_directory(conf);
@@ -32,7 +27,7 @@ pub(crate) fn find_scriptlet(conf: &mut Config, name: &str, action: &str) -> Pat
     path
 }
 pub(crate) fn scriptlet_config(
-    conf: &mut Config,
+    conf: &Config,
     name: &str,
 ) -> Result<HashMap<String, String>, ApplyError> {
     let maybe_name_config: HashMap<String, config::Value> = conf
@@ -41,7 +36,8 @@ pub(crate) fn scriptlet_config(
     debug!("maybe_name_config {:#?}", maybe_name_config);
     let mut name_config: HashMap<String, String> = HashMap::new();
     for (k, v) in maybe_name_config {
-        name_config.insert(k, v.into_str().unwrap());
+        let vstr = v.to_string();
+        name_config.insert(k, vstr);
     }
     Ok(name_config)
 }

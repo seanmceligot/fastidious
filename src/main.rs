@@ -16,6 +16,9 @@ extern crate thiserror;
 //extern crate toml;
 extern crate which;
 
+use config::builder::{BuilderState, ConfigBuilder};
+use config::Config;
+
 use ansi_term::Colour::{Green, Red, Yellow};
 use seahorse::{Flag, FlagType};
 //use failure::Error;
@@ -133,35 +136,36 @@ fn is_applied_action(c: &seahorse::Context) {
             if !is {
                 panic!("not applied")
             }
-        },
+        }
         Err(e) => panic!("{:?}", e),
     }
 }
 fn try_apply_action(c: &seahorse::Context) -> Result<(), ApplyError> {
     debug!("apply_action");
     let maybe_name = c.args.first();
-    let c1 = &mut config::Config::default();
-    let conf = configfile::load_config(c1).map_err(|e| ApplyError::ConfigError(e.to_string()))?;
+    let conf = Config::builder()
+        .add_source(config::Environment::with_prefix("FASTIDIOUS"))
+        .add_source(config::File::with_name("fastidious").required(false))
+        .build()
+        .map_err(|e| ApplyError::ConfigError(e.to_string()))?;
 
     let name_config: HashMap<String, String> = if let Some(name) = maybe_name {
-        configfile::scriptlet_config(conf, name).expect("scriptlet_config")
+        configfile::scriptlet_config(&conf, name).expect("scriptlet_config")
     } else {
         HashMap::new()
     };
-    let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, conf);
+    let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, &conf);
     let is_applied_script = maybe_is_applied_script?;
 
-
-    let is = do_is_applied(name_config.clone(), &is_applied_script)
-            .map_err(|e| {
-                ApplyError::ScriptError(format!("script error {:?} {:?}", is_applied_script, e))
-            })?;
+    let is = do_is_applied(name_config.clone(), &is_applied_script).map_err(|e| {
+        ApplyError::ScriptError(format!("script error {:?} {:?}", is_applied_script, e))
+    })?;
 
     if is {
         debug!("already applied");
         Ok(())
     } else {
-        let maybe_apply_script = lookup_apply_script(c, maybe_name, &name_config, conf);
+        let maybe_apply_script = lookup_apply_script(c, maybe_name, &name_config, &conf);
         let apply_script = maybe_apply_script.unwrap();
 
         let mode = get_mode(c);
@@ -173,7 +177,7 @@ fn lookup_is_applied_script(
     c: &seahorse::Context,
     maybe_name: Option<&String>,
     name_config: &HashMap<String, String>,
-    conf: &mut config::Config,
+    conf: &config::Config,
 ) -> Result<VirtualFile, ApplyError> {
     let script_arg_name = "ifnot";
     let script_param_name = "is_applied";
@@ -193,7 +197,7 @@ fn lookup_apply_script(
     c: &seahorse::Context,
     maybe_name: Option<&String>,
     name_config: &HashMap<String, String>,
-    conf: &mut config::Config,
+    conf: &config::Config,
 ) -> Result<VirtualFile, ApplyError> {
     let script_arg_name = "then";
     let script_param_name = "apply";
@@ -215,7 +219,7 @@ fn lookup_script(
     maybe_name: Option<&String>,
     name_config: &HashMap<String, String>,
     script_param_name: &str,
-    conf: &mut config::Config,
+    conf: &config::Config,
     script_file_name: &str,
 ) -> Result<VirtualFile, ApplyError> {
     let maybe_ifnot = c.string_flag(script_arg_name);
@@ -245,25 +249,27 @@ fn lookup_script(
 fn try_is_applied_action(c: &seahorse::Context) -> Result<bool, ApplyError> {
     println!("is_applied_action");
     let maybe_name = c.args.first();
-    let c1 = &mut config::Config::default();
-    let conf = configfile::load_config(c1).map_err(|e| ApplyError::ConfigError(e.to_string()))?;
+    let conf = Config::builder()
+        .add_source(config::Environment::with_prefix("FASTIDIOUS"))
+        .add_source(config::File::with_name("fastidious").required(false))
+        .build()
+        .map_err(|e| ApplyError::ConfigError(e.to_string()))?;
 
     let name_config: HashMap<String, String> = if let Some(name) = maybe_name {
-        configfile::scriptlet_config(conf, name).expect("scriptlet_config")
+        configfile::scriptlet_config(&conf, name).expect("scriptlet_config")
     } else {
         HashMap::new()
     };
-    let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, conf);
+    let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, &conf);
     let is_applied_script = maybe_is_applied_script?;
 
     do_is_applied(name_config.clone(), &is_applied_script)
-     
 }
 
 fn do_apply(
     name_config: HashMap<String, String>,
     script_path: &cmd::VirtualFile,
-    mode: files::Mode
+    mode: files::Mode,
 ) -> Result<(), ApplyError> {
     debug!("do_apply params {:#?} {:?}", name_config, mode);
     execute_apply(script_path, name_config, mode);
@@ -276,7 +282,7 @@ fn do_is_applied(
 ) -> Result<bool, ApplyError> {
     debug!("do_is_applied params {:#?}", name_config);
     debug!("do_is_applied script {:?}", script);
-    Ok( apply::is_applied(&script, name_config))
+    Ok(apply::is_applied(&script, name_config))
 }
 
 fn main() {
