@@ -117,7 +117,7 @@ impl VirtualFile {
                     path.clone(),
                     source,
                 )?;
-                Ok(ReadableFile { path: path })
+                Ok(ReadableFile { path })
             }
         }
     }
@@ -208,7 +208,7 @@ fn write_file(
         .map_err(|e| ApplyError::FileCreateError(format!("{:?} {:?}", path, e)))?;
     f.write_all(source.as_bytes())
         .map_err(|e| ApplyError::FileWriteError(format!("write_file {:?} {:?}", path, e)))?;
-    Ok(ExecutableFile { path: path })
+    Ok(ExecutableFile { path })
 }
 
 /*
