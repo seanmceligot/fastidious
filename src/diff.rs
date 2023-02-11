@@ -2,7 +2,7 @@ use crate::applyerr::Verb;
 use crate::fs::{can_create_dir, can_create_parent_dir, create_parent_dir};
 use ansi_term::Colour;
 use ansi_term::Colour::{Red, Yellow};
-use applyerr::Verb::{LIVE, SKIPPED, WOULD};
+use applyerr::Verb::{Live, Skipped, Would};
 use applyerr::{color_from_verb, ApplyError};
 use cmd::exectable_full_path;
 use files::Mode;
@@ -67,7 +67,7 @@ pub fn log_template_action(
     );
 }
 
-pub fn diff<'a>(path: PathBuf, path2: PathBuf) -> DiffStatus {
+pub fn diff(path: PathBuf, path2: PathBuf) -> DiffStatus {
     if !path2.exists() {
         DiffStatus::NewFile
     } else if !path2.is_file() {
@@ -80,7 +80,7 @@ pub fn diff<'a>(path: PathBuf, path2: PathBuf) -> DiffStatus {
             .expect("diff failed");
         //io::stdout().write_all(&output.stdout).unwrap();
         match output.status.code().unwrap() {
-            1 => DiffStatus::Changed(DiffText::Text(output.stdout.clone())),
+            1 => DiffStatus::Changed(DiffText::Text(output.stdout)),
             2 => DiffStatus::Failed,
             0 => DiffStatus::NoChanges,
             _ => DiffStatus::Failed,
@@ -157,7 +157,7 @@ fn create_passive(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<
 }
 fn copy_active(gen: &GenFile, dest: &DestFile, template: &SrcFile) -> Result<(), ApplyError> {
     create_parent_dir(Mode::Active, dest.path())?;
-    log_template_action("create from template", LIVE, template, gen, dest);
+    log_template_action("create from template", Live, template, gen, dest);
     match std::fs::copy(gen.path(), dest.path()) {
         Err(e) => Err(ApplyError::CopyError(
             gen.path(),
@@ -227,7 +227,7 @@ fn update_from_template_passive(
     gen: &GenFile,
     dest: &DestFile,
 ) -> Result<(), ApplyError> {
-    log_template_action("create from template", WOULD, template, gen, dest);
+    log_template_action("create from template", Would, template, gen, dest);
     println!("{}", difftext);
     Ok(())
 }
@@ -251,7 +251,7 @@ fn update_from_template_interactive(
     match ans {
         'd' => update_from_template_passive(difftext, template, gen, dest),
         'k' => {
-            log_template_action("create from template", SKIPPED, template, gen, dest);
+            log_template_action("create from template", Skipped, template, gen, dest);
             Ok(())
         }
         't' => {
@@ -260,6 +260,6 @@ fn update_from_template_interactive(
         }
         'm' => merge_to_template_interactive(template, gen, dest).map(|_status_code| ()),
         'o' => copy_active(gen, dest, template),
-        _ => update_from_template(Mode::Interactive, template, &gen, dest),
+        _ => update_from_template(Mode::Interactive, template, gen, dest),
     }
 }

@@ -1,7 +1,7 @@
 
-dryrun_local=cargo run -- dry
+dryrun_local=cargo run -- dryrun
 #dryrun_local=RUST_BACKTRACE=full cargo run --bin dryrun -- --debug
-dryrun_installed=noname dry
+dryrun_installed=noname dryrun
 dryrun=${dryrun_local}
 default: test
 

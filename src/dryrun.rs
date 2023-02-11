@@ -78,7 +78,7 @@ fn parse_type(input: &str) -> Type {
         }
     }
 }
-fn process_template_file<'t>(
+fn process_template_file(
     mode: Mode,
     vars: Vars,
     template: &SrcFile,
@@ -112,17 +112,17 @@ fn test_execute_active() -> Result<(), ApplyError> {
 fn execute_inactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
     //        let exe_path = exectable_full_path(cmd)?;
     let cli = format!("{:?} {} {:?}", vars, script, args);
-    log_cmd_action("run", Verb::WOULD, cli);
+    log_cmd_action("run", Verb::Would, cli);
     Ok(())
 }
 fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Result<(), ApplyError> {
     let o = script.as_executable()?;
     let mut ps = Command::new(o.path());
     debug!("execute_active {:?}", ps);
-    if args.len() > 0 {
+    if !args.is_empty() {
         ps.args(args);
     }
-    if vars.len() > 0 {
+    if !vars.is_empty() {
         ps.envs(vars);
     }
     let output = ps.output().map_err(|e| {
@@ -133,7 +133,7 @@ fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Resul
             e
         ))
     })?;
-    println!("{} {}", Green.paint("LIVE: run "), format!("{}", script));
+    println!("{} {}", Green.paint("LIVE: run "), script);
     io::stdout()
         .write_all(&output.stdout)
         .expect("error writing to stdout");
@@ -158,7 +158,7 @@ fn execute_interactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<
     let strargs = args.join(" ");
     match ask(&format!("run (y/n): {} {}", script, strargs)) {
         'n' => Ok(()),
-        'y' => execute_active(script, args, &vars),
+        'y' => execute_active(script, args, vars),
         _ => execute_interactive(script, args, vars),
     }
 }
@@ -171,7 +171,7 @@ pub fn execute(mode: Mode, cmd: &VirtualFile, args: Args, vars: &Vars) -> Result
     }
 }
 
-pub fn do_action<'g>(mode: Mode, vars: Vars, action: Action) -> Result<(), ApplyError> {
+pub fn do_action(mode: Mode, vars: Vars, action: Action) -> Result<(), ApplyError> {
     match action {
         Action::Template(template_file_name, output_file_name) => {
             let template_file = SrcFile::new(template_file_name);
@@ -220,8 +220,12 @@ pub(crate) fn dryrun(input_list_vec: Iter<String>, mode: Mode) -> Result<(), App
                         .pop_front()
                         .expect("expected output: tp template output"),
                 );
-                if infile.starts_with("data:") {
-                    Action::Template(VirtualFile::InMemory(infile[5..].into()), outfile)
+                let prefix = "data:";
+                if infile.starts_with(prefix) {
+                    Action::Template(
+                        VirtualFile::InMemory(infile.strip_prefix(prefix).unwrap().to_string()),
+                        outfile,
+                    )
                 } else {
                     Action::Template(VirtualFile::FsPath(PathBuf::from(infile)), outfile)
                 }

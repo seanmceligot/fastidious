@@ -4,7 +4,7 @@ use seahorse::App;
 use std::{env, path::PathBuf};
 use userinput::ask;
 //use std::path::PathBuf;
-use applyerr::{log_path_action, ApplyError, Verb::SKIPPED};
+use applyerr::{log_path_action, ApplyError, Verb::Skipped};
 use files::Mode;
 use std::ffi::CString;
 

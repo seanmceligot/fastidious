@@ -45,32 +45,30 @@ fn test_match_line() {
         None => panic!("expected Template"),
     }
 }
-fn match_line<'a>(line: &'a str) -> Option<(Range<usize>, Range<usize>)> {
+fn match_line(line: &str) -> Option<(Range<usize>, Range<usize>)> {
     let left_delim = "@@";
     let left_delim_len = left_delim.len();
     let right_delim = "@@";
     let right_delim_len = right_delim.len();
-    match line.find(left_delim) {
-        Some(start_of_left_delim) => {
-            match line[start_of_left_delim + left_delim_len..].find(right_delim) {
-                Some(start_of_right_delim) => Some((
+    line.find(left_delim).and_then(|start_of_left_delim| {
+        line[start_of_left_delim + left_delim_len..]
+            .find(right_delim)
+            .map(|start_of_right_delim| {
+                (
                     Range {
                         start: start_of_left_delim + left_delim_len,
                         end: start_of_right_delim + start_of_left_delim + left_delim_len,
                     },
                     Range {
                         start: start_of_left_delim,
-                        end: start_of_right_delim
+                        end: (start_of_right_delim
                             + start_of_left_delim
                             + right_delim_len
-                            + left_delim_len,
+                            + left_delim_len),
                     },
-                )),
-                None => None,
-            }
-        }
-        None => None,
-    }
+                )
+            })
+    })
 }
 pub enum ChangeString {
     Changed(String),

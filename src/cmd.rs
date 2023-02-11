@@ -201,7 +201,7 @@ fn exectable_full_path_which(
 fn write_file(
     options: &mut OpenOptions,
     path: PathBuf,
-    source: &String,
+    source: &str,
 ) -> Result<ExecutableFile, ApplyError> {
     let mut f = options
         .open(path.clone())

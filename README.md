@@ -53,6 +53,13 @@ status code:  0
 Script done.
 ```
 
+Templates
+
+```console
+fastidious dryrun --active v key1 real_value t 'data:key1 is @@key1@@' file.out
+LIVE: create from template InMemory("key1 is @@key1@@") [1414268916.gen.tmp]  ->file.out
+```
+
 Arguments
 =========
 

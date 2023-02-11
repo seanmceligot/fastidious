@@ -23,6 +23,7 @@ simple_logger = "1.6.0"
 which = "4.0.2"
 thiserror = "*"
 libc="*"
+encryptfile="*"
 
 [dev-dependencies]
 assert_cmd = "1.0.1"

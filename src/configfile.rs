@@ -10,7 +10,7 @@ fn get_script_directory(conf: &Config) -> PathBuf {
         Err(_) => dirs::home_dir().unwrap_or_else(|| std::env::current_dir().unwrap()),
     };
     println!("script dir: {:?}", script_dir);
-    let script_path = script_dir.clone();
+    let script_path = script_dir;
     if !script_path.exists() {
         panic!("{:?} does not exist", script_path);
     }

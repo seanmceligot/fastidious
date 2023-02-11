@@ -81,9 +81,9 @@ pub enum ApplyError {
 }
 #[derive(Debug, Copy, Clone)]
 pub enum Verb {
-    WOULD,
-    LIVE,
-    SKIPPED,
+    Would,
+    Live,
+    Skipped,
 }
 impl fmt::Display for Verb {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -93,9 +93,9 @@ impl fmt::Display for Verb {
 }
 pub fn color_from_verb(verb: Verb) -> Colour {
     match verb {
-        Verb::WOULD => Colour::Yellow,
-        Verb::LIVE => Colour::Green,
-        Verb::SKIPPED => Colour::Yellow,
+        Verb::Would => Colour::Yellow,
+        Verb::Live => Colour::Green,
+        Verb::Skipped => Colour::Yellow,
     }
 }
 pub fn log_cmd_action(action: &'static str, verb: Verb, cli: String) {
