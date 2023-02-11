@@ -108,10 +108,7 @@ pub fn replace_line(vars: Vars, line: String) -> Result<ChangeString, ApplyError
     }
 }
 // creates the tmp file for comparing to the dest file
-pub fn generate_recommended_file<'a, 'b>(
-    vars: Vars,
-    template: &'b SrcFile,
-) -> Result<GenFile, ApplyError> {
+pub fn generate_recommended_file(vars: Vars, template: &SrcFile) -> Result<GenFile, ApplyError> {
     let gen = GenFile::new()?;
     let maybe_infile = template.open();
     let infile =

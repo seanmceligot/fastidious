@@ -263,7 +263,7 @@ fn try_is_applied_action(c: &seahorse::Context) -> Result<bool, ApplyError> {
     let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, &conf);
     let is_applied_script = maybe_is_applied_script?;
 
-    do_is_applied(name_config.clone(), &is_applied_script)
+    do_is_applied(name_config, &is_applied_script)
 }
 
 fn do_apply(
@@ -282,7 +282,7 @@ fn do_is_applied(
 ) -> Result<bool, ApplyError> {
     debug!("do_is_applied params {:#?}", name_config);
     debug!("do_is_applied script {:?}", script);
-    Ok(apply::is_applied(&script, name_config))
+    Ok(apply::is_applied(script, name_config))
 }
 
 fn main() {
