@@ -2,7 +2,6 @@
 extern crate ansi_term;
 extern crate config;
 extern crate dirs;
-extern crate dotenv;
 extern crate env_logger;
 extern crate getopts;
 extern crate glob;
@@ -13,7 +12,6 @@ extern crate seahorse;
 extern crate serde_derive;
 extern crate simple_logger;
 extern crate thiserror;
-//extern crate toml;
 extern crate which;
 
 use config::builder::{BuilderState, ConfigBuilder};
@@ -57,8 +55,17 @@ fn test_appply() -> Result<(), ApplyError> {
 }
 
 fn main1() -> Result<(), ApplyError> {
-    dotenv::dotenv().ok();
     env_logger::init();
+    let conf = Config::builder()
+        .add_source(config::Environment::with_prefix("FASTIDIOUS"))
+        .add_source(config::File::with_name("fastidious").required(false))
+        .build()
+        .map_err(|e| ApplyError::ConfigError(e.to_string()))?;
+    println!(
+        "config {:?}",
+        conf.try_deserialize::<HashMap<String, String>>()
+            .map_err(|e| ApplyError::ConfigError(e.to_string()))?
+    );
     let args: Vec<String> = env::args().collect();
 
     let dry_command = seahorse::Command::new("dryrun")
