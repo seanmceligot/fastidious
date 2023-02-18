@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use ansi_term::Colour;
+use config::ConfigError;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::{ffi::OsString, fmt};
@@ -54,8 +55,8 @@ pub enum ApplyError {
     #[error("Insufficient Privileges {0}")]
     InsufficientPrivileges(String),
 
-    #[error("Error in config {0}")]
-    ConfigError(String),
+    #[error("#[from] Error in config")]
+    ConfigError(ConfigError),
     // #[error("Path not found {0}")]
     // PathNotFound(String),
     #[error("Path not found")]
@@ -76,7 +77,7 @@ pub enum ApplyError {
     #[error("No Parent Dir {0}")]
     NoParent(String),
 
-    #[error("Script Error {0} {}")]
+    #[error("Script Error {0}")]
     ScriptError(String),
 }
 #[derive(Debug, Copy, Clone)]
