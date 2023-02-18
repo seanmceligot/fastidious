@@ -1,11 +1,7 @@
+use crate::applyerr::ApplyError;
 use crate::fs;
-use crate::{
-    applyerr::ApplyError,
-    dryrun::{do_action, Action},
-};
 use ansi_term::Colour::{Green, Red, Yellow};
 use env_logger::Env;
-use seahorse::App;
 use std::fmt;
 use std::fs::canonicalize;
 use std::io::Read;
@@ -24,6 +20,27 @@ pub type Vars = HashMap<String, String>;
 
 pub type Args = Vec<String>;
 
+pub(crate) fn to_vars(v: Vec<String>) -> Vars {
+    v.iter()
+        .map(|s| s.split_once('='))
+        .flatten()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect::<HashMap<_, _>>()
+}
+#[test]
+fn test_vars() -> () {
+    {
+        let v = vec![
+            "a=1".to_string(),
+            "b=2".to_string(),
+            "c=3".to_string(),
+            "foobarred".to_string(),
+            "d=4".to_string(),
+        ];
+        let vars = to_vars(v);
+        assert_eq!(vars.get("b").unwrap(), "2");
+    }
+}
 #[test]
 fn test_virtual_file() -> Result<(), ApplyError> {
     let _ = env_logger::Builder::from_env(Env::default().default_filter_or("trace")).try_init();
@@ -122,39 +139,6 @@ impl VirtualFile {
         }
     }
 }
-/*
-    pub fn open_readonly(&self) -> Result<OpenFileHolder,ApplyError> {
-        self.open(
-            OpenOptions::new().read(true))
-    }
-
-    pub fn open_exec(&self) -> Result<OpenFileHolder,ApplyError> {
-        self.as_executable().
-        //self.open(  OpenOptions::new().write(true).create(true).mode(0o700))
-    }
-    pub fn open_write(&self) -> Result<OpenFileHolder,ApplyError> {
-        self.open(
-            OpenOptions::new().write(true).create(true).mode(0o600))
-    }
-    pub fn open(&self, options: &OpenOptions) -> Result<OpenFileHolder,ApplyError> {
-            match self {
-            VirtualFile::FsPath(path) => {
-                let f = OpenOptions::new().read(true).open(path)
-                .map_err(|e|
-                    ApplyError::FileReadError(format!("read error {:?} {:?}", path, e)))?;
-                Ok(OpenFileHolder::Perm(f, path.to_path_buf()))
-            },
-            VirtualFile::InMemory(source) => {
-
-                let readf = options
-                .open(path.clone())
-                .map_err(|e|ApplyError::FileCreateError(format!("{:?} {:?}", path, e)))?;
-                Ok(OpenFileHolder::Temp(readf, path))
-            }
-        }
-    }
-}
- */
 impl fmt::Display for VirtualFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

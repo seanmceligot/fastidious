@@ -1,9 +1,11 @@
 
 dryrun_local=cargo run -- dryrun
 #dryrun_local=RUST_BACKTRACE=full cargo run --bin dryrun -- --debug
-dryrun_installed=noname dryrun
 dryrun=${dryrun_local}
 default: test
+
+help:
+	cargo run -- dryrun --help
 
 test:  lint
 	RUST_BACKTRACE=1 RUST_LOG=debug cargo test --verbose
@@ -58,8 +60,8 @@ cmd:
 unapply:
 	cargo run -- unapply example1 
 
-apply_with_var: 
-	cargo run -- apply --ifnot 'test -f myfile.config' --then 'echo key=value > myfile.config'
+apply_with_var:
+	./fastidious-debug.sh -v -- apply --ifnot 'test -f myfile.config' --then 'echo key=value > myfile.config'
 	diff <(echo '') myfile.config
 
 apply_passive: 
@@ -127,7 +129,7 @@ x_active:
 	$(dryrun) --active v key1 fake_value t 'data:key1 is @@key1@@' $@.out
 	$(dryrun) --active x chmod 600 $@.out
 
-active_env: DRYRUN_ACTIVE=1
+active_env: FASTIDIOUS_ACTIVE=1
 active_env:
 	$(dryrun) x ls -l Makefile
 

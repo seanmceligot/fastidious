@@ -29,55 +29,6 @@ use std::str;
 use template::{generate_recommended_file, replace_line, ChangeString};
 use userinput::ask;
 
-pub(crate) fn print_usage(program: &str) {
-    println!("{}", program);
-    println!("v key value            set template variable ");
-    println!("t infile outfile       copy infile to outfile replacing @@key@@ with value  ");
-    println!("x command arg1 arg2    run command  ");
-    println!("-- x command -arg      run command (add -- to make sure hyphens are passed on");
-}
-#[derive(Debug)]
-pub enum Action {
-    Template(VirtualFile, String),
-    Execute(VirtualFile, Args),
-    Error(ApplyError),
-    None,
-}
-#[derive(Debug)]
-enum Type {
-    Template,
-    Execute,
-    //InputFile,
-    //OutputFile,
-    Variable,
-    Unknown,
-}
-#[test]
-fn test_parse_type() {
-    match parse_type(&String::from("t")) {
-        Type::Template => {}
-        _ => panic!("expected Template"),
-    }
-    match parse_type(&String::from("x")) {
-        Type::Execute => {}
-        _ => panic!("expected Execute"),
-    }
-    match parse_type(&String::from("v")) {
-        Type::Variable => {}
-        _ => panic!("expected Template"),
-    }
-}
-fn parse_type(input: &str) -> Type {
-    match input {
-        "t" => Type::Template,
-        "x" => Type::Execute,
-        "v" => Type::Variable,
-        _ => {
-            debug!("Unknown {}", input);
-            Type::Unknown
-        }
-    }
-}
 fn process_template_file(
     mode: Mode,
     vars: Vars,
@@ -171,105 +122,45 @@ pub fn execute(mode: Mode, cmd: &VirtualFile, args: Args, vars: &Vars) -> Result
     }
 }
 
-pub fn do_action(mode: Mode, vars: Vars, action: Action) -> Result<(), ApplyError> {
-    match action {
-        Action::Template(template_file_name, output_file_name) => {
-            let template_file = SrcFile::new(template_file_name);
-            let output_file = DestFile::new(PathBuf::from(output_file_name));
-            process_template_file(mode, vars, &template_file, &output_file).map(|_diff_status| ())
-        }
-        Action::Execute(cmd, args) => {
-            debug!("do_action execute {:?} {:?} {:?}", mode, cmd, args);
-            execute(mode, &cmd, args, &vars)
-        }
-        Action::Error(ae) => Err(ae),
-        Action::None => Ok(()),
-    }
-}
-
 #[test]
 fn test_do_action() -> Result<(), ApplyError> {
     let _ = env_logger::Builder::from_env(Env::default().default_filter_or("trace")).try_init();
     let mut vars: Vars = Vars::new();
     vars.insert("value".into(), "FILLED".into());
-    let template = Action::Template(
-        VirtualFile::InMemory(String::from("key=@@value@@")),
-        String::from("key_unit_test.txt"),
-    );
-    do_action(Mode::Passive, vars, template)?;
+    let src = SrcFile::new(VirtualFile::InMemory(String::from("key=@@value@@")));
+    let dest = DestFile::new(PathBuf::from("key_unit_test.txt"));
+    process_template_file(Mode::Passive, vars, &src, &dest)?;
     // cat key_unit_test.txt  should be key=FILLED
     Ok(())
 }
+pub(crate) fn do_template(
+    mode: Mode,
+    vars: Vars,
+    maybe_data: Option<String>,
+    maybe_in: Option<PathBuf>,
+    output_file: DestFile,
+) -> Result<(), ApplyError> {
+    let infile = match maybe_data {
+        Some(data) => VirtualFile::InMemory(data),
+        None => VirtualFile::FsPath(PathBuf::from(maybe_in.unwrap())), // TODO: check unwrap
+    };
+    debug!("vars {:#?}", vars);
 
-pub(crate) fn dryrun(input_list_vec: Iter<String>, mode: Mode) -> Result<(), ApplyError> {
+    let template_file = SrcFile::new(infile);
+    process_template_file(mode, vars, &template_file, &output_file).map(|_diff_status| ())
+}
+pub(crate) fn dryrun(mode: Mode, vars: Vars, cmd_line: Vec<String>) -> Result<(), ApplyError> {
+    let cmd_exe = &cmd_line[0];
+    let cmd_args = &cmd_line[1..];
     debug!("dryrun {:?}", mode);
-    let mut vars = Vars::new();
-    let mut input_list = input_list_vec.collect::<VecDeque<_>>();
-    while let Some(input) = input_list.pop_front() {
-        let t: Type = parse_type(input);
-        debug!("type {:?}", t);
-        let action = match t {
-            Type::Template => {
-                let infile = String::from(
-                    input_list
-                        .pop_front()
-                        .expect("expected template: tp template output"),
-                );
-                let outfile = String::from(
-                    input_list
-                        .pop_front()
-                        .expect("expected output: tp template output"),
-                );
-                let prefix = "data:";
-                if infile.starts_with(prefix) {
-                    Action::Template(
-                        VirtualFile::InMemory(infile.strip_prefix(prefix).unwrap().to_string()),
-                        outfile,
-                    )
-                } else {
-                    Action::Template(VirtualFile::FsPath(PathBuf::from(infile)), outfile)
-                }
-            }
-            Type::Variable => {
-                if let Some(k) = input_list.pop_front() {
-                    debug!("k {}", k);
-                    if let Some(v) = input_list.pop_front() {
-                        vars.insert(k.into(), v.into());
-                        debug!("v {}", v);
-                        Action::None
-                    } else {
-                        Action::Error(ApplyError::ExpectedArg(format!("value for {}", k)))
-                    }
-                } else {
-                    Action::Error(ApplyError::ExpectedArg("key".into()))
-                }
-            }
-            Type::Execute => match input_list.pop_front() {
-                None => Action::Error(ApplyError::ExpectedArg("expected execute path".into())),
-                Some(cmd) => {
-                    let exe = exectable_full_path(cmd)?;
-                    debug!("exe {:?}", exe);
-                    let script = VirtualFile::FsPath(exe);
-                    let mut args = Args::new();
-                    debug!("input_list {:?}", input_list);
-                    for e in input_list.split_off(0) {
-                        let arg = e.to_string();
-                        debug!("arg {}", arg);
-                        args.push(arg);
-                    }
-                    debug!("input_list {:?}", input_list);
-                    debug!("args {:?}", args);
-                    Action::Execute(script, args)
-                }
-            },
-            Type::Unknown => {
-                println!("{} {}", Red.paint("Unknown type:"), Red.paint(input));
-                Action::Error(ApplyError::ExpectedArg(format!("Unknown type: {}", input)))
-            }
-        };
-        //debug!("vars {:#?}", &vars);
-        debug!("action {:#?}", action);
-        do_action(mode, vars.clone(), action)?;
+    let exe = exectable_full_path(cmd_exe)?;
+    debug!("exe {:?}", exe);
+    let script = VirtualFile::FsPath(exe);
+    let mut args = Args::new();
+    for a in cmd_args {
+        args.push(a.to_string());
     }
-    Ok(())
+    debug!("args {:?}", args);
+    debug!("do_action execute {:?} {:?} {:?}", mode, script, args);
+    execute(mode, &script, args, &vars)
 }

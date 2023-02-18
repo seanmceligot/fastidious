@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+
 extern crate ansi_term;
 extern crate config;
 extern crate dirs;
@@ -7,6 +8,7 @@ extern crate getopts;
 extern crate glob;
 #[macro_use]
 extern crate log;
+extern crate clap;
 extern crate regex;
 extern crate seahorse;
 extern crate serde_derive;
@@ -14,8 +16,12 @@ extern crate simple_logger;
 extern crate thiserror;
 extern crate which;
 
+use crate::cmd::Vars;
+use clap::{Parser, Subcommand};
 use config::builder::{BuilderState, ConfigBuilder};
 use config::Config;
+use files::DestFile;
+use files::Mode;
 
 use ansi_term::Colour::{Green, Red, Yellow};
 use seahorse::{Flag, FlagType};
@@ -54,114 +60,175 @@ fn test_appply() -> Result<(), ApplyError> {
     Ok(())
 }
 
+/// A fictional versioning CLI
+#[derive(Debug, Parser)] // requires `derive` feature
+#[command(name = "fastidious")]
+#[command(about = "fastidious", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+// https://docs.rs/clap/latest/clap/_derive/index.html#arg-attributes
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Clones repos
+    #[command(arg_required_else_help = true)]
+    Dryrun {
+        #[clap(short, long)]
+        active: bool,
+        #[clap(short, long)]
+        passive: bool,
+        #[clap(short, long)]
+        interactive: bool,
+        #[arg(short, long,num_args=0..)]
+        var: Vec<String>,
+        #[arg(last = true, allow_hyphen_values = true)]
+        cmd: Vec<String>,
+    },
+    Template {
+        #[clap(short, long)]
+        active: bool,
+        #[clap(short, long)]
+        passive: bool,
+        #[clap(short, long)]
+        interactive: bool,
+        #[arg(short, long)]
+        var: Vec<String>,
+        #[arg(short = 'I', long)]
+        infile: Option<PathBuf>,
+        #[arg(short, long)]
+        out: PathBuf,
+        #[arg(last = true, allow_hyphen_values = true)]
+        data: Option<Vec<String>>,
+    },
+    Apply {
+        #[arg(short, long)]
+        name: Option<String>,
+        #[clap(short, long)]
+        active: bool,
+        #[clap(short, long)]
+        passive: bool,
+        #[clap(short, long)]
+        interactive: bool,
+        #[arg(short = 'I', long)]
+        ifnot: Option<String>,
+        #[arg(short, long)]
+        then: String,
+        #[arg(short, long)]
+        var: Vec<String>,
+    },
+    IsApplied {
+        #[arg(short, long)]
+        name: String,
+        #[arg(short, long)]
+        ifnot: String,
+    },
+}
+
 fn main1() -> Result<(), ApplyError> {
     env_logger::init();
-    let conf = Config::builder()
+    debug!("debug enabled");
+    info!("info enabled");
+
+    info!("info enabled");
+    let _conf = Config::builder()
         .add_source(config::Environment::with_prefix("FASTIDIOUS"))
         .add_source(config::File::with_name("fastidious").required(false))
         .build()
-        .map_err(|e| ApplyError::ConfigError(e.to_string()))?;
-    println!(
-        "config {:?}",
-        conf.try_deserialize::<HashMap<String, String>>()
-            .map_err(|e| ApplyError::ConfigError(e.to_string()))?
-    );
-    let args: Vec<String> = env::args().collect();
+        .map_err(|e| ApplyError::ConfigError(e))?;
+    info!("after conf");
 
-    let dry_command = seahorse::Command::new("dryrun")
-        .description("dryrun [name]")
-        .alias("d")
-        .action(dry_action)
-        .flag(Flag::new("active", FlagType::Bool).alias("A"))
-        .flag(Flag::new("interactive", FlagType::Bool).alias("I"));
+    let args = Cli::parse();
 
-    let apply_command = seahorse::Command::new("apply")
-        .description("apply [name] if is_applied")
-        .alias("a")
-        .action(apply_action)
-        .flag(Flag::new("active", FlagType::Bool).alias("A"))
-        .flag(Flag::new("interactive", FlagType::Bool).alias("I"))
-        .flag(Flag::new("ifnot", FlagType::String).alias("P"))
-        .flag(Flag::new("then", FlagType::String).alias("Z"))
-        .flag(Flag::new("var", FlagType::String).alias("V"));
-
-    // use apply::execute_apply;
-    let is_applied_command = seahorse::Command::new("is_applied")
-        .description("is_applied [name] if not already applied")
-        .alias("i")
-        .action(is_applied_action)
-        .flag(Flag::new("ifnot", FlagType::String).alias("P"));
-
-    let app = seahorse::App::new(env!("CARGO_PKG_NAME"))
-        .description(env!("CARGO_PKG_DESCRIPTION"))
-        .author(env!("CARGO_PKG_AUTHORS"))
-        .version(env!("CARGO_PKG_VERSION"))
-        .command(apply_command)
-        .command(is_applied_command)
-        .command(dry_command);
-
-    app.run(args);
-
+    match args.command {
+        Commands::Dryrun {
+            active,
+            passive,
+            interactive,
+            var,
+            cmd,
+        } => {
+            let mode = get_mode(active, passive, interactive);
+            let vars = crate::cmd::to_vars(var);
+            debug!("vars {:#?}", vars);
+            debug!("cmd {:#?}", cmd);
+            dryrun::dryrun(mode, vars, cmd)?
+        }
+        Commands::Apply {
+            name,
+            active,
+            interactive,
+            ifnot,
+            then,
+            var,
+            passive,
+        } => {
+            let mode = get_mode(active, passive, interactive);
+            let vars = crate::cmd::to_vars(var);
+            apply_action(name, mode, ifnot, then, vars)?
+        }
+        Commands::IsApplied { name, ifnot } => {
+            debug!("maybe_ifnot {:?}", ifnot);
+            debug!("name{:?}", name);
+            todo!()
+        }
+        Commands::Template {
+            active,
+            interactive,
+            passive,
+            var,
+            data,
+            infile,
+            out,
+        } => {
+            let mode = get_mode(active, interactive, passive);
+            let vars = crate::cmd::to_vars(var);
+            let output_file = DestFile::new(out);
+            let str_data = match data {
+                Some(v) => Some(v.join(" ")),
+                None => None,
+            };
+            debug!("str_data {:?}", str_data);
+            dryrun::do_template(mode, vars, str_data, infile, output_file)?
+        }
+    }
     Ok(())
 }
-fn get_mode(c: &seahorse::Context) -> files::Mode {
-    if c.bool_flag("active") {
+
+fn get_mode(active: bool, _passive: bool, interactive: bool) -> files::Mode {
+    if active {
         files::Mode::Active
-    } else if c.bool_flag("interactive") {
+    } else if interactive {
         files::Mode::Interactive
     } else {
         files::Mode::Passive
     }
 }
-fn dry_action(c: &seahorse::Context) {
-    debug!("dry_action");
-    if c.args.is_empty() {
-        dryrun::print_usage("noname dryrun COMMAND");
-        return;
-    }
-    if let Some(name) = c.args.first() {
-        debug!("dry_action {}", name);
-    }
-
-    let mode = get_mode(c);
-    match dryrun::dryrun(c.args.iter(), mode) {
-        Ok(_) => {}
-        Err(e) => {
-            println!("{} {}", Red.paint("error:"), Red.paint(e.to_string()));
-        }
-    }
-}
-fn apply_action(c: &seahorse::Context) {
-    match try_apply_action(c) {
-        Ok(_) => (),
-        Err(e) => error!("{:?}", e),
-    }
-}
-fn is_applied_action(c: &seahorse::Context) {
-    match try_is_applied_action(c) {
-        Ok(is) => {
-            if !is {
-                panic!("not applied")
-            }
-        }
-        Err(e) => panic!("{:?}", e),
-    }
-}
-fn try_apply_action(c: &seahorse::Context) -> Result<(), ApplyError> {
+fn apply_action(
+    maybe_name: Option<String>,
+    mode: Mode,
+    ifnot: Option<String>,
+    _then: String,
+    _var: Vars,
+) -> Result<(), ApplyError> {
     debug!("apply_action");
-    let maybe_name = c.args.first();
+    let maybe_name_str = maybe_name.as_deref();
+
     let conf = Config::builder()
         .add_source(config::Environment::with_prefix("FASTIDIOUS"))
         .add_source(config::File::with_name("fastidious").required(false))
         .build()
-        .map_err(|e| ApplyError::ConfigError(e.to_string()))?;
+        .map_err(|e| ApplyError::ConfigError(e))?;
 
-    let name_config: HashMap<String, String> = if let Some(name) = maybe_name {
+    let name_config: HashMap<String, String> = if let Some(name) = maybe_name_str {
         configfile::scriptlet_config(&conf, name).expect("scriptlet_config")
     } else {
         HashMap::new()
     };
-    let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, &conf);
+    let maybe_is_applied_script =
+        lookup_is_applied_script(maybe_name_str, &name_config, &conf, ifnot.as_deref());
     let is_applied_script = maybe_is_applied_script?;
 
     let is = do_is_applied(name_config.clone(), &is_applied_script).map_err(|e| {
@@ -172,102 +239,91 @@ fn try_apply_action(c: &seahorse::Context) -> Result<(), ApplyError> {
         debug!("already applied");
         Ok(())
     } else {
-        let maybe_apply_script = lookup_apply_script(c, maybe_name, &name_config, &conf);
+        let maybe_apply_script =
+            lookup_apply_script(maybe_name.as_deref(), &name_config, &conf, ifnot.as_deref());
         let apply_script = maybe_apply_script.unwrap();
 
-        let mode = get_mode(c);
         do_apply(name_config, &apply_script, mode)
     }
 }
 
 fn lookup_is_applied_script(
-    c: &seahorse::Context,
-    maybe_name: Option<&String>,
+    maybe_name: Option<&str>,
     name_config: &HashMap<String, String>,
     conf: &config::Config,
+    maybe_ifnot: Option<&str>,
 ) -> Result<VirtualFile, ApplyError> {
     let script_arg_name = "ifnot";
     let script_param_name = "is_applied";
     let script_file_name = "is-applied";
 
     lookup_script(
-        c,
         script_arg_name,
         maybe_name,
         name_config,
         script_param_name,
         conf,
         script_file_name,
+        maybe_ifnot,
     )
 }
 fn lookup_apply_script(
-    c: &seahorse::Context,
-    maybe_name: Option<&String>,
+    maybe_name: Option<&str>,
     name_config: &HashMap<String, String>,
     conf: &config::Config,
+    maybe_ifnot: Option<&str>,
 ) -> Result<VirtualFile, ApplyError> {
     let script_arg_name = "then";
     let script_param_name = "apply";
     let script_file_name = "apply";
 
     lookup_script(
-        c,
         script_arg_name,
         maybe_name,
         name_config,
         script_param_name,
         conf,
         script_file_name,
+        maybe_ifnot,
     )
 }
 fn lookup_script(
-    c: &seahorse::Context,
-    script_arg_name: &str,
-    maybe_name: Option<&String>,
+    _script_arg_name: &str,
+    maybe_name: Option<&str>,
     name_config: &HashMap<String, String>,
     script_param_name: &str,
     conf: &config::Config,
     script_file_name: &str,
+    maybe_ifnot: Option<&str>,
 ) -> Result<VirtualFile, ApplyError> {
-    let maybe_ifnot = c.string_flag(script_arg_name);
     debug!("maybe_ifnot {:?}", maybe_ifnot);
-    let maybe_is_applied_script = match maybe_ifnot {
-        Ok(s) => Ok(VirtualFile::in_memory_shell(s)),
-        Err(_e) => match maybe_name {
-            Some(name) => {
-                // check name_config for "is_applied"
-                match name_config.get(script_param_name) {
-                    Some(source) => Ok(cmd::VirtualFile::in_memory_shell(source.clone())),
-                    None => Ok(cmd::VirtualFile::FsPath(configfile::find_scriptlet(
-                        conf,
-                        name,
-                        script_file_name,
-                    ))),
-                }
-            }
-            None => Err(ApplyError::VarNotFound(format!(
-                "arg --{} or config {} or file {}",
-                script_arg_name, script_param_name, script_file_name
-            ))),
-        },
-    };
-    maybe_is_applied_script
+    let _script = name_config
+        .get(script_param_name)
+        .map(|source| cmd::VirtualFile::in_memory_shell(source.to_string()));
+    if let Some(name) = maybe_name {
+        let slet = configfile::find_scriptlet(conf, name, script_file_name);
+        debug!("scriptlet {:?}", slet);
+    }
+    todo!();
 }
-fn try_is_applied_action(c: &seahorse::Context) -> Result<bool, ApplyError> {
+fn _try_is_applied_action(
+    maybe_name: Option<&str>,
+    maybe_ifnot: Option<&str>,
+) -> Result<bool, ApplyError> {
     println!("is_applied_action");
-    let maybe_name = c.args.first();
     let conf = Config::builder()
         .add_source(config::Environment::with_prefix("FASTIDIOUS"))
         .add_source(config::File::with_name("fastidious").required(false))
         .build()
-        .map_err(|e| ApplyError::ConfigError(e.to_string()))?;
+        .map_err(|e| ApplyError::ConfigError(e))?;
 
     let name_config: HashMap<String, String> = if let Some(name) = maybe_name {
         configfile::scriptlet_config(&conf, name).expect("scriptlet_config")
     } else {
         HashMap::new()
     };
-    let maybe_is_applied_script = lookup_is_applied_script(c, maybe_name, &name_config, &conf);
+    let maybe_is_applied_script =
+        lookup_is_applied_script(maybe_name.as_deref(), &name_config, &conf, maybe_ifnot);
     let is_applied_script = maybe_is_applied_script?;
 
     do_is_applied(name_config, &is_applied_script)
