@@ -26,7 +26,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::slice::Iter;
 use std::str;
-use template::{generate_recommended_file, replace_line, ChangeString};
+use template::{generate_recommended_file, replace_line, replace_line2, ChangeString};
 use userinput::ask;
 
 fn process_template_file(
@@ -70,9 +70,14 @@ fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Resul
     let o = script.as_executable()?;
     let mut ps = Command::new(o.path());
     debug!("execute_active {:?}", ps);
-    if !args.is_empty() {
-        ps.args(args);
-    }
+    let mrv: Vec<String> = args
+        .iter()
+        .map(|a| replace_line2(&vars, a))
+        .collect::<Result<Vec<String>, ApplyError>>()?;
+
+    debug!("{:?}", mrv);
+    ps.args(mrv);
+    //}
     if !vars.is_empty() {
         ps.envs(vars);
     }

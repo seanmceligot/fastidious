@@ -74,11 +74,42 @@ pub enum ChangeString {
     Changed(String),
     Unchanged,
 }
-pub fn replace_line(vars: Vars, line: String) -> Result<ChangeString, ApplyError> {
-    match match_line(line.as_str()) {
+pub fn replace_line2(vars: &Vars, line: &str) -> Result<String, ApplyError> {
+    match match_line(line) {
         Some((inner, outer)) => {
             debug!("{}", line,);
-            debug!("01234567890123456789012345678901234567890123456789012345678901234567890");
+            let key = &line[inner.start..inner.end];
+            trace!("key {}", key);
+            let mut new_line: String = String::new();
+            let v = vars.get(key);
+            trace!("vars {:?}", vars);
+            trace!("val {:?}", v);
+            trace!("line {:?}", line);
+            trace!("inner {} {}", inner.start, inner.end);
+            trace!("outer {} {}", outer.start, outer.end);
+            let before: &str = &line[..outer.start];
+            let after: &str = &line[outer.end..];
+            trace!("before {}", before);
+            new_line.push_str(before);
+
+            if let Some(value) = v {
+                new_line.push_str(value);
+                new_line.push_str(after);
+                new_line.push('\n');
+                trace!("value {}", value);
+                trace!("after {}", after);
+                Ok(new_line)
+            } else {
+                Err(ApplyError::VarNotFound(String::from(key)))
+            }
+        }
+        None => Ok(line.to_owned()),
+    }
+}
+pub fn replace_line(vars: &Vars, line: &str) -> Result<ChangeString, ApplyError> {
+    match match_line(line) {
+        Some((inner, outer)) => {
+            debug!("{}", line,);
             let key = &line[inner.start..inner.end];
             trace!("key {}", key);
             let mut new_line: String = String::new();
@@ -117,7 +148,7 @@ pub fn generate_recommended_file(vars: Vars, template: &SrcFile) -> Result<GenFi
     let mut tmpfile = gen.open()?;
     for maybe_line in reader.lines() {
         let line: String = maybe_line.unwrap();
-        match replace_line(vars.clone(), line.clone()) {
+        match replace_line(&vars, &line) {
             Ok(replaced_line) => match replaced_line {
                 ChangeString::Changed(new_line) => {
                     writeln!(tmpfile, "{}", new_line).expect("write failed");

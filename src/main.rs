@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![feature(array_chunks)]
 
 extern crate ansi_term;
 extern crate config;
@@ -94,7 +95,7 @@ enum Commands {
         passive: bool,
         #[clap(short, long)]
         interactive: bool,
-        #[arg(short, long)]
+        #[arg(short, long,num_args=0..)]
         var: Vec<String>,
         #[arg(short = 'I', long)]
         infile: Option<PathBuf>,
@@ -116,7 +117,7 @@ enum Commands {
         ifnot: Option<String>,
         #[arg(short, long)]
         then: String,
-        #[arg(short, long)]
+        #[arg(short, long, num_args=0..)]
         var: Vec<String>,
     },
     IsApplied {
@@ -151,7 +152,7 @@ fn main1() -> Result<(), ApplyError> {
             cmd,
         } => {
             let mode = get_mode(active, passive, interactive);
-            let vars = crate::cmd::to_vars(var);
+            let vars = crate::cmd::to_vars_split_odd(var);
             debug!("vars {:#?}", vars);
             debug!("cmd {:#?}", cmd);
             dryrun::dryrun(mode, vars, cmd)?
@@ -166,7 +167,7 @@ fn main1() -> Result<(), ApplyError> {
             passive,
         } => {
             let mode = get_mode(active, passive, interactive);
-            let vars = crate::cmd::to_vars(var);
+            let vars = crate::cmd::to_vars_split_odd(var);
             apply_action(name, mode, ifnot, then, vars)?
         }
         Commands::IsApplied { name, ifnot } => {
@@ -184,7 +185,7 @@ fn main1() -> Result<(), ApplyError> {
             out,
         } => {
             let mode = get_mode(active, interactive, passive);
-            let vars = crate::cmd::to_vars(var);
+            let vars = crate::cmd::to_vars_split_odd(var);
             let output_file = DestFile::new(out);
             let str_data = match data {
                 Some(v) => Some(v.join(" ")),
