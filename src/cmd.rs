@@ -20,12 +20,19 @@ pub type Vars = HashMap<String, String>;
 
 pub type Args = Vec<String>;
 
-pub(crate) fn to_vars(v: Vec<String>) -> Vars {
+pub(crate) fn _to_vars_split_eq(v: Vec<String>) -> Vars {
     v.iter()
         .map(|s| s.split_once('='))
         .flatten()
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect::<HashMap<_, _>>()
+}
+pub(crate) fn to_vars_split_odd(v: Vec<String>) -> Vars {
+    let ch = v.array_chunks();
+    let m: HashMap<_, _> = ch
+        .map(|[k, v]| (k.to_owned(), v.to_owned()))
+        .collect::<HashMap<_, _>>();
+    m
 }
 #[test]
 fn test_vars() -> () {
@@ -37,8 +44,20 @@ fn test_vars() -> () {
             "foobarred".to_string(),
             "d=4".to_string(),
         ];
-        let vars = to_vars(v);
+        let vars = to_vars_split_odd(v);
         assert_eq!(vars.get("b").unwrap(), "2");
+    }
+    {
+        let v = vec![
+            "a".to_string(),
+            "1".to_string(),
+            "c".to_string(),
+            "3".to_string(),
+            "d".to_string(),
+            "4".to_string(),
+        ];
+        let vars = to_vars_split_odd(v);
+        assert_eq!(vars.get("c").unwrap(), "3");
     }
 }
 #[test]
