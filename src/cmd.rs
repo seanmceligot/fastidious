@@ -44,7 +44,7 @@ fn test_vars() -> () {
             "foobarred".to_string(),
             "d=4".to_string(),
         ];
-        let vars = to_vars_split_odd(v);
+        let vars = _to_vars_split_eq(v);
         assert_eq!(vars.get("b").unwrap(), "2");
     }
     {
