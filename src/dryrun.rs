@@ -62,25 +62,27 @@ fn test_execute_active() -> Result<(), ApplyError> {
 
 fn execute_inactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
     //        let exe_path = exectable_full_path(cmd)?;
-    let cli = format!("{:?} {} {:?}", vars, script, args);
+    let filled_args = replace_all(&args, vars)?;
+    let cli = format!("{:?} {} {:?}", vars, script, filled_args);
     log_cmd_action("run", Verb::Would, cli);
     Ok(())
+}
+fn replace_all(args: &Vec<String>, vars: &Vars) -> Result<Vec<String>, ApplyError> {
+    let filled_args: Vec<String> = args
+        .iter()
+        .map(|a| replace_line2(&vars, a))
+        .collect::<Result<Vec<String>, ApplyError>>()?;
+    debug!("{:?}", filled_args);
+    Ok(filled_args)
 }
 fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Result<(), ApplyError> {
     let o = script.as_executable()?;
     let mut ps = Command::new(o.path());
     debug!("execute_active {:?}", ps);
-    let mrv: Vec<String> = args
-        .iter()
-        .map(|a| replace_line2(&vars, a))
-        .collect::<Result<Vec<String>, ApplyError>>()?;
+    let filled_args = replace_all(&args, vars)?;
+    ps.args(filled_args);
 
-    debug!("{:?}", mrv);
-    ps.args(mrv);
-    //}
-    if !vars.is_empty() {
-        ps.envs(vars);
-    }
+    //ps.envs(vars);
     let output = ps.output().map_err(|e| {
         ApplyError::ExecError(format!(
             "execute_active output: {:?} {:?} {:?}",
@@ -111,7 +113,8 @@ fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Resul
 }
 
 fn execute_interactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
-    let strargs = args.join(" ");
+    let filled_args = replace_all(&args, vars)?;
+    let strargs = filled_args.join(" ");
     match ask(&format!("run (y/n): {} {}", script, strargs)) {
         'n' => Ok(()),
         'y' => execute_active(script, args, vars),
