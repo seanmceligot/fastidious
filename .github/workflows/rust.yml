@@ -1,8 +1,7 @@
-name: Rust
+name: Rust nightly
 on:
   push:
   pull_request:
-name: nightly clippy
 jobs:
   lint:
     runs-on: ubuntu-latest
