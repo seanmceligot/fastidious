@@ -6,12 +6,13 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
+      - run: apt-get update && apt-get install -y curl
+      - uses: actions/checkout@main
       - id: component
         uses: actions-rs/components-nightly@v1
         with:
           component: clippy
       - uses: actions-rs/toolchain@v1
         with:
-            toolchain: ${{ steps.component.outputs.toolchain }}
-            override: true
+          toolchain: ${{ steps.component.outputs.toolchain }}
+          override: true
