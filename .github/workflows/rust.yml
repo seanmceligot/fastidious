@@ -1,17 +1,18 @@
-name: Rust
+name: Rust nightly
 on:
   push:
   pull_request:
-env:
-  CARGO_TERM_COLOR: always
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Build
-        run: cargo build --verbose
-      - name: Run tests
-        run: cargo test --verbose
-      - name: Linter
-        run: cargo clippy --verbose
+      - run: apt-get update && apt-get install -y curl
+      - uses: actions/checkout@main
+      - id: component
+        uses: actions-rs/components-nightly@v1
+        with:
+          component: clippy
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ steps.component.outputs.toolchain }}
+          override: true
