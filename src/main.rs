@@ -100,7 +100,7 @@ enum Commands {
         #[arg(short = 'I', long)]
         infile: Option<PathBuf>,
         #[arg(short, long)]
-        out: PathBuf,
+        out: Option<PathBuf>,
         #[arg(last = true, allow_hyphen_values = true)]
         data: Option<Vec<String>>,
     },
@@ -138,7 +138,7 @@ fn main1() -> Result<(), ApplyError> {
         .add_source(config::Environment::with_prefix("FASTIDIOUS"))
         .add_source(config::File::with_name("fastidious").required(false))
         .build()
-        .map_err(|e| ApplyError::ConfigError(e))?;
+        .map_err(ApplyError::ConfigError)?;
     info!("after conf");
 
     let args = Cli::parse();
@@ -186,12 +186,12 @@ fn main1() -> Result<(), ApplyError> {
         } => {
             let mode = get_mode(active, interactive, passive);
             let vars = crate::cmd::to_vars_split_odd(var);
-            let output_file = DestFile::new(out);
-            let str_data = match data {
-                Some(v) => Some(v.join(" ")),
-                None => None,
-            };
+            let str_data = data.map(|v| v.join(" "));
             debug!("str_data {:?}", str_data);
+            let output_file = match out {
+                Some(of) => DestFile::new(of),
+                None => DestFile::new(PathBuf::from("/dev/stdout")),
+            };
             dryrun::do_template(mode, vars, str_data, infile, output_file)?
         }
     }
@@ -221,7 +221,7 @@ fn apply_action(
         .add_source(config::Environment::with_prefix("FASTIDIOUS"))
         .add_source(config::File::with_name("fastidious").required(false))
         .build()
-        .map_err(|e| ApplyError::ConfigError(e))?;
+        .map_err(ApplyError::ConfigError)?;
 
     let name_config: HashMap<String, String> = if let Some(name) = maybe_name_str {
         configfile::scriptlet_config(&conf, name).expect("scriptlet_config")
@@ -316,7 +316,7 @@ fn _try_is_applied_action(
         .add_source(config::Environment::with_prefix("FASTIDIOUS"))
         .add_source(config::File::with_name("fastidious").required(false))
         .build()
-        .map_err(|e| ApplyError::ConfigError(e))?;
+        .map_err(ApplyError::ConfigError)?;
 
     let name_config: HashMap<String, String> = if let Some(name) = maybe_name {
         configfile::scriptlet_config(&conf, name).expect("scriptlet_config")
@@ -324,7 +324,7 @@ fn _try_is_applied_action(
         HashMap::new()
     };
     let maybe_is_applied_script =
-        lookup_is_applied_script(maybe_name.as_deref(), &name_config, &conf, maybe_ifnot);
+        lookup_is_applied_script(maybe_name, &name_config, &conf, maybe_ifnot);
     let is_applied_script = maybe_is_applied_script?;
 
     do_is_applied(name_config, &is_applied_script)

@@ -67,10 +67,10 @@ fn execute_inactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(),
     log_cmd_action("run", Verb::Would, cli);
     Ok(())
 }
-fn replace_all(args: &Vec<String>, vars: &Vars) -> Result<Vec<String>, ApplyError> {
+fn replace_all(args: &[String], vars: &Vars) -> Result<Vec<String>, ApplyError> {
     let filled_args: Vec<String> = args
         .iter()
-        .map(|a| replace_line2(&vars, a))
+        .map(|a| replace_line2(vars, a))
         .collect::<Result<Vec<String>, ApplyError>>()?;
     debug!("{:?}", filled_args);
     Ok(filled_args)
@@ -150,7 +150,7 @@ pub(crate) fn do_template(
 ) -> Result<(), ApplyError> {
     let infile = match maybe_data {
         Some(data) => VirtualFile::InMemory(data),
-        None => VirtualFile::FsPath(PathBuf::from(maybe_in.unwrap())), // TODO: check unwrap
+        None => VirtualFile::FsPath(maybe_in.unwrap()), // TODO: check unwrap
     };
     debug!("vars {:#?}", vars);
 
