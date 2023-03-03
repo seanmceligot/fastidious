@@ -1,18 +1,26 @@
-name: Rust
-on:
-  push:
-  pull_request:
+on: [push, pull_request]
+
+name: Nightly lints
+
 jobs:
-  lint:
+  clippy:
+    name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - run: apt-get update && apt-get install -y curl
-      - uses: actions/checkout@main
-      - id: component
-        uses: actions-rs/components-nightly@v1
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install nightly toolchain with clippy available
+        uses: actions-rs/toolchain@v1
         with:
-          component: clippy
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ steps.component.outputs.toolchain }}
+          profile: minimal
+          toolchain: nightly
           override: true
+          components: clippy
+
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        continue-on-error: true  # WARNING: only for this example, remove it!
+        with:
+          command: clippy
+          args: -- -D warnings
