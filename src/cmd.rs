@@ -22,8 +22,7 @@ pub type Args = Vec<String>;
 
 pub(crate) fn _to_vars_split_eq(v: Vec<String>) -> Vars {
     v.iter()
-        .map(|s| s.split_once('='))
-        .flatten()
+        .filter_map(|s| s.split_once('='))
         .map(|(k, v)| (k.to_owned(), v.to_owned()))
         .collect::<HashMap<_, _>>()
 }

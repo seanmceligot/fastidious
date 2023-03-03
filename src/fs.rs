@@ -114,7 +114,7 @@ pub fn can_create_parent_dir(child: PathBuf) -> Result<(), ApplyError> {
 }
 pub fn can_execute(path: PathBuf) -> Result<(), ApplyError> {
     trace!("can_execute{:?}", path);
-    let r = if path.exists() {
+    if path.exists() {
         if !path.is_dir() {
             access_x(path)
         } else {
@@ -122,12 +122,11 @@ pub fn can_execute(path: PathBuf) -> Result<(), ApplyError> {
         }
     } else {
         Err(ApplyError::PathNotFound(format!("{:?}", path)))
-    };
-    r
+    }
 }
 pub fn can_read_file(path: PathBuf) -> Result<(), ApplyError> {
     trace!("can_read_file{:?}", path);
-    let r = if path.exists() {
+    if path.exists() {
         if !path.is_dir() {
             access_r(path)
         } else {
@@ -135,12 +134,11 @@ pub fn can_read_file(path: PathBuf) -> Result<(), ApplyError> {
         }
     } else {
         Err(ApplyError::PathNotFound(format!("{:?}", path)))
-    };
-    r
+    }
 }
 
 pub fn can_create_dir(dir: PathBuf) -> Result<(), ApplyError> {
-    trace!("can_create_dir{:?}", dir);
+    trace!("can_create_dir {:?}", dir);
     if dir.exists() {
         access_x(dir)
     } else {
