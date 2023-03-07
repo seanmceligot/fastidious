@@ -12,25 +12,21 @@ use std::{
 
 use crate::{
     cmd::{self, Args, Vars},
-    dryrun::{self, execute},
+    dryrun::{self, execute, ActionResult},
 };
 
 pub(crate) fn execute_apply(
     script: &cmd::VirtualFile,
     vars: Vars,
     mode: crate::files::Mode,
-) -> bool {
+) -> Result<ActionResult, ApplyError> {
     let args = Args::new();
-    match dryrun::execute(mode, script, args, &vars) {
-        Ok(_) => {
-            println!("{}", Green.paint("Applied"));
-            true
-        }
-        Err(e) => {
-            println!("{} {:?}", Yellow.paint("Apply Failed"), e);
-            false
-        }
-    }
+    dryrun::execute(mode, script, args, &vars).map_err(|e| {
+        ApplyError::ExecError(format!(
+            "execute_apply execute failed: {:?} {:?} {:?} {:?}",
+            script, vars, mode, e
+        ))
+    })
 }
 pub(crate) fn is_applied(script: &cmd::VirtualFile, vars: HashMap<String, String>) -> bool {
     let args = Args::new();

@@ -21,6 +21,7 @@ use crate::cmd::Vars;
 use clap::{Parser, Subcommand};
 use config::builder::{BuilderState, ConfigBuilder};
 use config::Config;
+use dryrun::ActionResult;
 use files::DestFile;
 use files::Mode;
 
@@ -128,7 +129,7 @@ enum Commands {
     },
 }
 
-fn main1() -> Result<(), ApplyError> {
+fn main1() -> Result<ActionResult, ApplyError> {
     env_logger::init();
     debug!("debug enabled");
     info!("info enabled");
@@ -155,7 +156,7 @@ fn main1() -> Result<(), ApplyError> {
             let vars = crate::cmd::to_vars_split_odd(var);
             debug!("vars {:#?}", vars);
             debug!("cmd {:#?}", cmd);
-            dryrun::dryrun(mode, vars, cmd)?
+            dryrun::dryrun(mode, vars, cmd)
         }
         Commands::Apply {
             name,
@@ -168,7 +169,7 @@ fn main1() -> Result<(), ApplyError> {
         } => {
             let mode = get_mode(active, passive, interactive);
             let vars = crate::cmd::to_vars_split_odd(var);
-            apply_action(name, mode, ifnot, then, vars)?
+            apply_action(mode, ifnot, then, vars)
         }
         Commands::IsApplied { name, ifnot } => {
             debug!("maybe_ifnot {:?}", ifnot);
@@ -192,10 +193,10 @@ fn main1() -> Result<(), ApplyError> {
                 Some(of) => DestFile::new(of),
                 None => DestFile::new(PathBuf::from("/dev/stdout")),
             };
-            dryrun::do_template(mode, vars, str_data, infile, output_file)?
+            dryrun::do_template(mode, vars, str_data, infile, output_file)
+                .map(|ds| ActionResult::from(ds))
         }
     }
-    Ok(())
 }
 
 fn get_mode(active: bool, _passive: bool, interactive: bool) -> files::Mode {
@@ -208,104 +209,56 @@ fn get_mode(active: bool, _passive: bool, interactive: bool) -> files::Mode {
     }
 }
 fn apply_action(
-    maybe_name: Option<String>,
     mode: Mode,
-    ifnot: Option<String>,
-    _then: String,
-    _var: Vars,
-) -> Result<(), ApplyError> {
+    maybe_ifnot: Option<String>,
+    then: String,
+    vars: Vars,
+) -> Result<ActionResult, ApplyError> {
     debug!("apply_action");
-    let maybe_name_str = maybe_name.as_deref();
 
-    let conf = Config::builder()
+    let _conf = Config::builder()
         .add_source(config::Environment::with_prefix("FASTIDIOUS"))
         .add_source(config::File::with_name("fastidious").required(false))
         .build()
         .map_err(ApplyError::ConfigError)?;
 
-    let name_config: HashMap<String, String> = if let Some(name) = maybe_name_str {
-        configfile::scriptlet_config(&conf, name).expect("scriptlet_config")
+    let is = if let Some(ifnot) = maybe_ifnot {
+        let is_applied_script = VirtualFile::InMemory(ifnot);
+        do_is_applied(vars.clone(), &is_applied_script).map_err(|e| {
+            ApplyError::ScriptError(format!("script error {:?} {:?}", is_applied_script, e))
+        })
     } else {
-        HashMap::new()
-    };
-    let maybe_is_applied_script =
-        lookup_is_applied_script(maybe_name_str, &name_config, &conf, ifnot.as_deref());
-    let is_applied_script = maybe_is_applied_script?;
-
-    let is = do_is_applied(name_config.clone(), &is_applied_script).map_err(|e| {
-        ApplyError::ScriptError(format!("script error {:?} {:?}", is_applied_script, e))
-    })?;
+        Ok(false)
+    }?;
 
     if is {
-        debug!("already applied");
-        Ok(())
+        info!("Already applied");
+        Ok(ActionResult::AlreadyApplied)
     } else {
-        let maybe_apply_script =
-            lookup_apply_script(maybe_name.as_deref(), &name_config, &conf, ifnot.as_deref());
-        let apply_script = maybe_apply_script.unwrap();
+        let apply_script = VirtualFile::InMemory(then);
 
-        do_apply(name_config, &apply_script, mode)
+        do_apply(vars, &apply_script, mode)
     }
 }
 
-fn lookup_is_applied_script(
-    maybe_name: Option<&str>,
-    name_config: &HashMap<String, String>,
-    conf: &config::Config,
-    maybe_ifnot: Option<&str>,
-) -> Result<VirtualFile, ApplyError> {
-    let script_arg_name = "ifnot";
-    let script_param_name = "is_applied";
-    let script_file_name = "is-applied";
-
-    lookup_script(
-        script_arg_name,
-        maybe_name,
-        name_config,
-        script_param_name,
-        conf,
-        script_file_name,
-        maybe_ifnot,
-    )
-}
-fn lookup_apply_script(
-    maybe_name: Option<&str>,
-    name_config: &HashMap<String, String>,
-    conf: &config::Config,
-    maybe_ifnot: Option<&str>,
-) -> Result<VirtualFile, ApplyError> {
-    let script_arg_name = "then";
-    let script_param_name = "apply";
-    let script_file_name = "apply";
-
-    lookup_script(
-        script_arg_name,
-        maybe_name,
-        name_config,
-        script_param_name,
-        conf,
-        script_file_name,
-        maybe_ifnot,
-    )
-}
 fn lookup_script(
-    _script_arg_name: &str,
     maybe_name: Option<&str>,
-    name_config: &HashMap<String, String>,
-    script_param_name: &str,
     conf: &config::Config,
-    script_file_name: &str,
-    maybe_ifnot: Option<&str>,
 ) -> Result<VirtualFile, ApplyError> {
-    debug!("maybe_ifnot {:?}", maybe_ifnot);
-    let _script = name_config
-        .get(script_param_name)
-        .map(|source| cmd::VirtualFile::in_memory_shell(source.to_string()));
+    debug!("maybe_name {:?}", maybe_name);
+    debug!("conf {:?}", conf);
     if let Some(name) = maybe_name {
-        let slet = configfile::find_scriptlet(conf, name, script_file_name);
+        debug!("name {:?}", name);
+        let slet = configfile::find_scriptlet(conf, name, name);
         debug!("scriptlet {:?}", slet);
+        if slet.exists() {
+            Ok(VirtualFile::FsPath(slet))
+        } else {
+            Err(ApplyError::PathBufNotFound(slet))
+        }
+    } else {
+        Err(ApplyError::ScriptError(String::from("Not provideded")))
     }
-    todo!();
 }
 fn _try_is_applied_action(
     maybe_name: Option<&str>,
@@ -323,8 +276,7 @@ fn _try_is_applied_action(
     } else {
         HashMap::new()
     };
-    let maybe_is_applied_script =
-        lookup_is_applied_script(maybe_name, &name_config, &conf, maybe_ifnot);
+    let maybe_is_applied_script = lookup_script(maybe_name, &conf);
     let is_applied_script = maybe_is_applied_script?;
 
     do_is_applied(name_config, &is_applied_script)
@@ -334,19 +286,18 @@ fn do_apply(
     name_config: HashMap<String, String>,
     script_path: &cmd::VirtualFile,
     mode: files::Mode,
-) -> Result<(), ApplyError> {
+) -> Result<ActionResult, ApplyError> {
     debug!("do_apply params {:#?} {:?}", name_config, mode);
-    execute_apply(script_path, name_config, mode);
-    Ok(())
+    execute_apply(script_path, name_config, mode)
 }
 
 fn do_is_applied(
-    name_config: HashMap<String, String>,
+    vars: HashMap<String, String>,
     script: &cmd::VirtualFile,
 ) -> Result<bool, ApplyError> {
-    debug!("do_is_applied params {:#?}", name_config);
     debug!("do_is_applied script {:?}", script);
-    Ok(apply::is_applied(script, name_config))
+    debug!("do_is_applied params {:#?}", vars);
+    Ok(apply::is_applied(script, vars))
 }
 
 fn main() {

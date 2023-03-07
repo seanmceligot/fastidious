@@ -29,6 +29,24 @@ use std::str;
 use template::{generate_recommended_file, replace_line, replace_line2, ChangeString};
 use userinput::ask;
 
+#[derive(Debug, Clone, Copy)]
+pub enum ActionResult {
+    Applied,
+    Skipped,
+    AlreadyApplied,
+    Created,
+}
+impl From<DiffStatus> for ActionResult {
+    fn from(ds: DiffStatus) -> Self {
+        match ds {
+            DiffStatus::NoChanges => Self::AlreadyApplied,
+            DiffStatus::NewFile => Self::Applied,
+            DiffStatus::Changed(_) => Self::Applied,
+            DiffStatus::Unsupported => Self::Skipped, // TODO: handle this
+            DiffStatus::Failed => Self::Skipped,      // TODO: handle this
+        }
+    }
+}
 fn process_template_file(
     mode: Mode,
     vars: Vars,
@@ -60,12 +78,16 @@ fn test_execute_active() -> Result<(), ApplyError> {
     Ok(())
 }
 
-fn execute_inactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
+fn execute_inactive(
+    script: &VirtualFile,
+    args: Args,
+    vars: &Vars,
+) -> Result<ActionResult, ApplyError> {
     //        let exe_path = exectable_full_path(cmd)?;
     let filled_args = replace_all(&args, vars)?;
     let cli = format!("{:?} {} {:?}", vars, script, filled_args);
     log_cmd_action("run", Verb::Would, cli);
-    Ok(())
+    Ok(ActionResult::Skipped)
 }
 fn replace_all(args: &[String], vars: &Vars) -> Result<Vec<String>, ApplyError> {
     let filled_args: Vec<String> = args
@@ -75,17 +97,26 @@ fn replace_all(args: &[String], vars: &Vars) -> Result<Vec<String>, ApplyError> 
     debug!("{:?}", filled_args);
     Ok(filled_args)
 }
-fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Result<(), ApplyError> {
+fn execute_active(
+    script: &VirtualFile,
+    args: Vec<String>,
+    vars: &Vars,
+) -> Result<ActionResult, ApplyError> {
     let o = script.as_executable()?;
     let mut ps = Command::new(o.path());
     debug!("execute_active {:?}", ps);
-    let filled_args = replace_all(&args, vars)?;
-    ps.args(filled_args);
+    if !args.is_empty() {
+        let filled_args = replace_all(&args, vars)?;
+        debug!("execute_active filled_args {:?}", filled_args);
+        ps.args(filled_args);
+    }
 
     //ps.envs(vars);
-    let output = ps.output().map_err(|e| {
+    let r = ps.output();
+    o.clean_tmp();
+    let output = r.map_err(|e| {
         ApplyError::ExecError(format!(
-            "execute_active output: {:?} {:?} {:?}",
+            "execute_active execute failed: {:?} {:?} {:?}",
             o.path(),
             script,
             e
@@ -103,7 +134,7 @@ fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Resul
                     Green.paint("status code: "),
                     Green.paint(n.to_string())
                 );
-                Ok(())
+                Ok(ActionResult::Applied)
             } else {
                 Err(ApplyError::NotZeroExit(n))
             }
@@ -112,17 +143,29 @@ fn execute_active(script: &VirtualFile, args: Vec<String>, vars: &Vars) -> Resul
     }
 }
 
-fn execute_interactive(script: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
+fn execute_interactive(
+    script: &VirtualFile,
+    args: Args,
+    vars: &Vars,
+) -> Result<(ActionResult), ApplyError> {
     let filled_args = replace_all(&args, vars)?;
     let strargs = filled_args.join(" ");
     match ask(&format!("run (y/n): {} {}", script, strargs)) {
-        'n' => Ok(()),
+        'n' => {
+            println!("{} {} {}", Yellow.paint("SKIP: run "), script, strargs);
+            Ok(ActionResult::Skipped)
+        }
         'y' => execute_active(script, args, vars),
         _ => execute_interactive(script, args, vars),
     }
 }
 
-pub fn execute(mode: Mode, cmd: &VirtualFile, args: Args, vars: &Vars) -> Result<(), ApplyError> {
+pub fn execute(
+    mode: Mode,
+    cmd: &VirtualFile,
+    args: Args,
+    vars: &Vars,
+) -> Result<ActionResult, ApplyError> {
     match mode {
         Mode::Interactive => execute_interactive(cmd, args, vars),
         Mode::Passive => execute_inactive(cmd, args, vars),
@@ -147,7 +190,7 @@ pub(crate) fn do_template(
     maybe_data: Option<String>,
     maybe_in: Option<PathBuf>,
     output_file: DestFile,
-) -> Result<(), ApplyError> {
+) -> Result<DiffStatus, ApplyError> {
     let infile = match maybe_data {
         Some(data) => VirtualFile::InMemory(data),
         None => VirtualFile::FsPath(maybe_in.unwrap()), // TODO: check unwrap
@@ -155,9 +198,13 @@ pub(crate) fn do_template(
     debug!("vars {:#?}", vars);
 
     let template_file = SrcFile::new(infile);
-    process_template_file(mode, vars, &template_file, &output_file).map(|_diff_status| ())
+    process_template_file(mode, vars, &template_file, &output_file)
 }
-pub(crate) fn dryrun(mode: Mode, vars: Vars, cmd_line: Vec<String>) -> Result<(), ApplyError> {
+pub(crate) fn dryrun(
+    mode: Mode,
+    vars: Vars,
+    cmd_line: Vec<String>,
+) -> Result<ActionResult, ApplyError> {
     let cmd_exe = &cmd_line[0];
     let cmd_args = &cmd_line[1..];
     debug!("dryrun {:?}", mode);

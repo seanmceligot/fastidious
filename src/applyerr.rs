@@ -22,6 +22,9 @@ pub enum ApplyError {
     #[error("path not found: {0}")]
     PathNotFound(String),
 
+    #[error("path not found: {0}")]
+    PathBufNotFound(PathBuf),
+
     #[error("file create error: {0}")]
     FileCreateError(String),
 
@@ -57,6 +60,7 @@ pub enum ApplyError {
 
     #[error("#[from] Error in config")]
     ConfigError(ConfigError),
+
     // #[error("Path not found {0}")]
     // PathNotFound(String),
     #[error("Path not found")]
@@ -80,6 +84,7 @@ pub enum ApplyError {
     #[error("Script Error {0}")]
     ScriptError(String),
 }
+
 #[derive(Debug, Copy, Clone)]
 pub enum Verb {
     Would,

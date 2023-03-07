@@ -1,7 +1,7 @@
 extern crate libc;
 use env_logger::Env;
 use seahorse::App;
-use std::{env, path::PathBuf};
+use std::{env, path::Path, path::PathBuf};
 use userinput::ask;
 //use std::path::PathBuf;
 use applyerr::{log_path_action, ApplyError, Verb::Skipped};
@@ -179,5 +179,11 @@ pub fn create_dir(mode: Mode, dir: PathBuf) -> Result<(), ApplyError> {
             }
             _ => create_dir(mode, dir), //repeat the question
         }
+    }
+}
+pub fn clean_tmp<P: AsRef<Path>>(path: P) -> () {
+    let r = std::fs::remove_file(path);
+    if let Err(e) = r {
+        warn!("error removing tmp {:?}", e);
     }
 }
