@@ -89,6 +89,11 @@ impl ExecutableFile {
     pub fn path(&self) -> PathBuf {
         self.path.clone()
     }
+
+    pub(crate) fn clean_tmp(&self) -> () {
+        debug!("delete {:?}", self.path);
+        fs::clean_tmp(&self.path);
+    }
 }
 pub struct ReadableFile {
     path: PathBuf,
@@ -127,6 +132,7 @@ impl VirtualFile {
                         .create(true)
                         .truncate(true),
                     path.clone(),
+                    Some("#!/bin/sh"),
                     source,
                 )?;
                 let fullpath = canonicalize(path).unwrap();
@@ -150,6 +156,7 @@ impl VirtualFile {
                         .truncate(true)
                         .create(true),
                     path.clone(),
+                    None,
                     source,
                 )?;
                 Ok(ReadableFile { path })
@@ -203,11 +210,18 @@ fn exectable_full_path_which(
 fn write_file(
     options: &mut OpenOptions,
     path: PathBuf,
+    maybe_shebang: Option<&str>,
     source: &str,
 ) -> Result<ExecutableFile, ApplyError> {
     let mut f = options
         .open(path.clone())
         .map_err(|e| ApplyError::FileCreateError(format!("{:?} {:?}", path, e)))?;
+    if let Some(shebang) = maybe_shebang {
+        f.write_all(shebang.as_bytes())
+            .map_err(|e| ApplyError::FileWriteError(format!("write_file {:?} {:?}", path, e)))?;
+        f.write_all("\n".as_bytes())
+            .map_err(|e| ApplyError::FileWriteError(format!("write_file {:?} {:?}", path, e)))?;
+    }
     f.write_all(source.as_bytes())
         .map_err(|e| ApplyError::FileWriteError(format!("write_file {:?} {:?}", path, e)))?;
     Ok(ExecutableFile { path })
