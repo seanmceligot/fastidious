@@ -1,6 +1,8 @@
 ![Build Status](https://github.com/seanmceligot/fastidious/actions/workflows/rust.yml/badge.svg)
 
+# build
 
+# use
 Test and apply if not already applied
 
 ```console

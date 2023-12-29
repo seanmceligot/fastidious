@@ -1,5 +1,4 @@
 #![allow(unused_imports)]
-#![feature(array_chunks)]
 
 extern crate ansi_term;
 extern crate config;
@@ -9,6 +8,7 @@ extern crate getopts;
 extern crate glob;
 #[macro_use]
 extern crate log;
+extern crate anyhow;
 extern crate clap;
 extern crate regex;
 extern crate seahorse;
@@ -18,6 +18,8 @@ extern crate thiserror;
 extern crate which;
 
 use crate::cmd::Vars;
+use anyhow::Error;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use config::builder::{BuilderState, ConfigBuilder};
 use config::Config;
@@ -27,7 +29,7 @@ use files::Mode;
 
 use ansi_term::Colour::{Green, Red, Yellow};
 use seahorse::{Flag, FlagType};
-//use failure::Error;
+
 use std::{
     collections::HashMap,
     env,
@@ -36,6 +38,7 @@ use std::{
     process::Command,
 };
 mod applyerr;
+pub mod passive;
 use applyerr::ApplyError;
 mod apply;
 mod cmd;
@@ -127,6 +130,16 @@ enum Commands {
         #[arg(short, long)]
         ifnot: String,
     },
+    // Save: save key and value to yaml file filename
+    // example: fastidious save --key "key" --value "value" --filename "filename"
+    Save {
+        #[arg(short, long)]
+        key: String,
+        #[arg(short, long)]
+        value: String,
+        #[arg(short, long)]
+        filename: String,
+    },
 }
 
 fn main1() -> Result<ActionResult, ApplyError> {
@@ -193,12 +206,44 @@ fn main1() -> Result<ActionResult, ApplyError> {
                 Some(of) => DestFile::new(of),
                 None => DestFile::new(PathBuf::from("/dev/stdout")),
             };
-            dryrun::do_template(mode, vars, str_data, infile, output_file)
-                .map(|ds| ActionResult::from(ds))
+            dryrun::do_template(mode, vars, str_data, infile, output_file).map(ActionResult::from)
         }
+        Commands::Save {
+            key,
+            value,
+            filename,
+        } => save_key_val(key, value, filename),
     }
 }
+fn load_yaml_to_hashmap(filename: &str) -> Result<HashMap<String, String>, ApplyError> {
+    let contents = std::fs::read_to_string(filename).map_err(ApplyError::IoError)?;
 
+    let yaml: HashMap<String, String> =
+        serde_yaml::from_str(&contents).map_err(ApplyError::YamlReadError)?;
+    Ok(yaml)
+}
+fn save_key_val(key: String, value: String, filename: String) -> Result<ActionResult, ApplyError> {
+    let filepath = Path::new(&filename);
+    if filepath.exists() {
+        let mut yaml = load_yaml_to_hashmap(&filename)?;
+        yaml.insert(key, value);
+        let mut file = std::fs::File::create(filepath)
+            .with_context(|| format!("Error creating {}", filename))?;
+        let yaml =
+            serde_yaml::to_string(&yaml).with_context(|| format!("error parsing {}", filename))?;
+        file.write_all(yaml.as_bytes())
+            .with_context(|| format!("error writing {}", filename))?;
+    } else {
+        let mut file = std::fs::File::create(filepath)?;
+        let mut map = HashMap::new();
+        map.insert(key.clone(), value);
+        let yaml = serde_yaml::to_string(&map)
+            .with_context(|| format!("error adding yaml key {}", key))?;
+        file.write_all(yaml.as_bytes())
+            .with_context(|| format!("error writing yaml {}", filename))?;
+    }
+    Ok(ActionResult::Applied)
+}
 fn get_mode(active: bool, _passive: bool, interactive: bool) -> files::Mode {
     if active {
         files::Mode::Active
@@ -219,8 +264,7 @@ fn apply_action(
     let _conf = Config::builder()
         .add_source(config::Environment::with_prefix("FASTIDIOUS"))
         .add_source(config::File::with_name("fastidious").required(false))
-        .build()
-        .map_err(ApplyError::ConfigError)?;
+        .build()?;
 
     let is = if let Some(ifnot) = maybe_ifnot {
         let is_applied_script = VirtualFile::InMemory(ifnot);

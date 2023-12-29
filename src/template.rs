@@ -142,8 +142,7 @@ pub fn replace_line(vars: &Vars, line: &str) -> Result<ChangeString, ApplyError>
 pub fn generate_recommended_file(vars: Vars, template: &SrcFile) -> Result<GenFile, ApplyError> {
     let gen = GenFile::new()?;
     let maybe_infile = template.open();
-    let infile =
-        maybe_infile.map_err(|e| ApplyError::FileReadError(format!("{:?} {:?}", template, e)))?;
+    let infile = maybe_infile?;
     let reader = BufReader::new(infile.file());
     let mut tmpfile = gen.open()?;
     for maybe_line in reader.lines() {

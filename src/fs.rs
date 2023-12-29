@@ -1,17 +1,13 @@
 extern crate libc;
+use applyerr::ApplyError;
 use env_logger::Env;
+use files::Mode;
 use seahorse::App;
+use std::ffi::CString;
 use std::{env, path::Path, path::PathBuf};
 use userinput::ask;
-//use std::path::PathBuf;
-use applyerr::{log_path_action, ApplyError, Verb::Skipped};
-use files::Mode;
-use std::ffi::CString;
 
-//#[cfg(not(test))]
 use log::trace;
-//#[cfg(test)]
-//use std::{println as trace};
 
 #[test]
 fn test_can() -> Result<(), ApplyError> {
@@ -181,9 +177,7 @@ pub fn create_dir(mode: Mode, dir: PathBuf) -> Result<(), ApplyError> {
         }
     }
 }
-pub fn clean_tmp<P: AsRef<Path>>(path: P) -> () {
-    let r = std::fs::remove_file(path);
-    if let Err(e) = r {
-        warn!("error removing tmp {:?}", e);
-    }
+pub fn clean_tmp<P: AsRef<Path>>(path: P) -> Result<(), ApplyError> {
+    std::fs::remove_file(path)?;
+    Ok(())
 }

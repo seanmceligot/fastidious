@@ -2,10 +2,10 @@ use crate::cmd::Args;
 use crate::cmd::Vars;
 use crate::cmd::VirtualFile;
 use crate::files::Mode;
+use crate::passive::log_cmd_action;
+use crate::passive::Verb;
 use ansi_term::Colour::{Green, Red, Yellow};
-use applyerr::log_cmd_action;
 use applyerr::ApplyError;
-use applyerr::Verb;
 use cmd::exectable_full_path;
 use diff::create_or_diff;
 use diff::diff;
@@ -15,7 +15,6 @@ use env_logger::Env;
 use files::DestFile;
 use files::GenFile;
 use files::SrcFile;
-use getopts::Options;
 use log::trace;
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
@@ -70,8 +69,9 @@ fn test_execute_active() -> Result<(), ApplyError> {
         ),
         _ => return Err(ApplyError::Error(String::from("OK not expected"))),
     }
+    let echo_hello = VirtualFile::in_memory_shell("echo hello".into());
     execute_active(
-        &VirtualFile::in_memory_shell("echo hello".into()),
+        &echo_hello,
         Args::new(),
         &Vars::new(),
     )?;
@@ -104,6 +104,7 @@ fn execute_active(
 ) -> Result<ActionResult, ApplyError> {
     let o = script.as_executable()?;
     let mut ps = Command::new(o.path());
+    debug!("o {:?}", o.path());
     debug!("execute_active {:?}", ps);
     if !args.is_empty() {
         let filled_args = replace_all(&args, vars)?;
@@ -113,7 +114,6 @@ fn execute_active(
 
     //ps.envs(vars);
     let r = ps.output();
-    o.clean_tmp();
     let output = r.map_err(|e| {
         ApplyError::ExecError(format!(
             "execute_active execute failed: {:?} {:?} {:?}",
@@ -147,7 +147,7 @@ fn execute_interactive(
     script: &VirtualFile,
     args: Args,
     vars: &Vars,
-) -> Result<(ActionResult), ApplyError> {
+) -> Result<ActionResult, ApplyError> {
     let filled_args = replace_all(&args, vars)?;
     let strargs = filled_args.join(" ");
     match ask(&format!("run (y/n): {} {}", script, strargs)) {

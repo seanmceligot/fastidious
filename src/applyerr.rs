@@ -2,10 +2,15 @@
 
 use ansi_term::Colour;
 use config::ConfigError;
-use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::{ffi::OsString, fmt};
 use thiserror::Error;
+
+use std::fmt::Debug;
+
+#[non_exhaustive]
+#[derive(Error, Debug)]
+pub enum ErrorMessage {}
 
 #[non_exhaustive]
 #[derive(Error, Debug)]
@@ -15,9 +20,6 @@ pub enum ApplyError {
 
     #[error("Warnings")]
     Warn,
-
-    #[error("file read error: {0}")]
-    FileReadError(String),
 
     #[error("path not found: {0}")]
     PathNotFound(String),
@@ -43,9 +45,6 @@ pub enum ApplyError {
     #[error("Non zero exit status code {0} ")]
     NotZeroExit(i32),
 
-    #[error("Io Error {0}")]
-    IoError(#[from] std::io::Error),
-
     #[error("Command not found {0}")]
     CommandNotFound(String),
 
@@ -58,11 +57,6 @@ pub enum ApplyError {
     #[error("Insufficient Privileges {0}")]
     InsufficientPrivileges(String),
 
-    #[error("#[from] Error in config")]
-    ConfigError(ConfigError),
-
-    // #[error("Path not found {0}")]
-    // PathNotFound(String),
     #[error("Path not found")]
     PathNotFound0,
 
@@ -83,42 +77,22 @@ pub enum ApplyError {
 
     #[error("Script Error {0}")]
     ScriptError(String),
+
+    #[error("Io Error {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("#[from] Error in config")]
+    ConfigError(ConfigError),
+
+    #[error("Yaml Read Error {0}")]
+    YamlReadError(#[from] serde_yaml::Error),
+
+    #[error("AnyHow Error {0}")]
+    AnyHowError(#[from] anyhow::Error),
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum Verb {
-    Would,
-    Live,
-    Skipped,
-}
-impl fmt::Display for Verb {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        //write!(f, "{:?}", self)
-        Debug::fmt(self, f)
+impl From<ConfigError> for ApplyError {
+    fn from(error: ConfigError) -> Self {
+        ApplyError::ConfigError(error)
     }
-}
-pub fn color_from_verb(verb: Verb) -> Colour {
-    match verb {
-        Verb::Would => Colour::Yellow,
-        Verb::Live => Colour::Green,
-        Verb::Skipped => Colour::Yellow,
-    }
-}
-pub fn log_cmd_action(action: &'static str, verb: Verb, cli: String) {
-    let color: Colour = color_from_verb(verb);
-    println!(
-        "{}: {}: {}",
-        color.paint(verb.to_string()),
-        color.paint(action),
-        color.paint(cli),
-    );
-}
-pub fn log_path_action(action: &'static str, verb: Verb, path: &Path) {
-    let color: Colour = color_from_verb(verb);
-    println!(
-        "{}: {}: {}",
-        color.paint(verb.to_string()),
-        color.paint(action),
-        color.paint(path.display().to_string()),
-    );
 }

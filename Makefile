@@ -5,7 +5,7 @@ dryrun=${dryrun_local}
 default: test
 
 help:
-	cargo run -- dryrun --help
+	cargo run -- --help
 
 test:  lint
 	RUST_BACKTRACE=1 RUST_LOG=debug cargo test --verbose
