@@ -130,11 +130,6 @@ impl ReadableFile {
 }
 
 impl VirtualFile {
-    pub(crate) fn in_memory_shell(script: String) -> Self {
-        let mut full_script = String::from("#! /bin/sh\n");
-        full_script.push_str(script.as_str());
-        Self::InMemory(full_script)
-    }
     pub fn as_executable(&self) -> Result<ExecutableFile, ApplyError> {
         match self {
             VirtualFile::FsPath(p) => {

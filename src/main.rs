@@ -56,8 +56,8 @@ use crate::cmd::VirtualFile;
 
 #[test]
 fn test_appply() -> Result<(), ApplyError> {
-    let apply_script = VirtualFile::in_memory_shell(String::from("touch test1.tmp"));
-    let is_applied = VirtualFile::in_memory_shell(String::from("test -f test1.tmp"));
+    let apply_script = VirtualFile::InMemory(String::from("#!/bin/sh\ntouch test1.tmp"));
+    let is_applied = VirtualFile::InMemory(String::from("#!/bin/sh\ntest -f test1.tmp"));
 
     let name_config: HashMap<String, String> = HashMap::new();
     do_is_applied(name_config.clone(), &is_applied)?;
@@ -109,8 +109,6 @@ enum Commands {
         data: Option<Vec<String>>,
     },
     Apply {
-        #[arg(short, long)]
-        name: Option<String>,
         #[clap(short, long)]
         active: bool,
         #[clap(short, long)]
@@ -172,7 +170,6 @@ fn main1() -> Result<ActionResult, ApplyError> {
             dryrun::dryrun(mode, vars, cmd)
         }
         Commands::Apply {
-            name,
             active,
             interactive,
             ifnot,
@@ -283,47 +280,6 @@ fn apply_action(
 
         do_apply(vars, &apply_script, mode)
     }
-}
-
-fn lookup_script(
-    maybe_name: Option<&str>,
-    conf: &config::Config,
-) -> Result<VirtualFile, ApplyError> {
-    debug!("maybe_name {:?}", maybe_name);
-    debug!("conf {:?}", conf);
-    if let Some(name) = maybe_name {
-        debug!("name {:?}", name);
-        let slet = configfile::find_scriptlet(conf, name, name);
-        debug!("scriptlet {:?}", slet);
-        if slet.exists() {
-            Ok(VirtualFile::FsPath(slet))
-        } else {
-            Err(ApplyError::PathBufNotFound(slet))
-        }
-    } else {
-        Err(ApplyError::ScriptError(String::from("Not provideded")))
-    }
-}
-fn _try_is_applied_action(
-    maybe_name: Option<&str>,
-    maybe_ifnot: Option<&str>,
-) -> Result<bool, ApplyError> {
-    println!("is_applied_action");
-    let conf = Config::builder()
-        .add_source(config::Environment::with_prefix("FASTIDIOUS"))
-        .add_source(config::File::with_name("fastidious").required(false))
-        .build()
-        .map_err(ApplyError::ConfigError)?;
-
-    let name_config: HashMap<String, String> = if let Some(name) = maybe_name {
-        configfile::scriptlet_config(&conf, name).expect("scriptlet_config")
-    } else {
-        HashMap::new()
-    };
-    let maybe_is_applied_script = lookup_script(maybe_name, &conf);
-    let is_applied_script = maybe_is_applied_script?;
-
-    do_is_applied(name_config, &is_applied_script)
 }
 
 fn do_apply(

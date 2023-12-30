@@ -33,7 +33,7 @@ pub enum ActionResult {
     Applied,
     Skipped,
     AlreadyApplied,
-    Created,
+    //Created,
 }
 impl From<DiffStatus> for ActionResult {
     fn from(ds: DiffStatus) -> Self {
@@ -57,6 +57,11 @@ fn process_template_file(
 }
 
 #[test]
+//    pub(crate) fn in_memory_shell(script: String) -> Self {
+//        let mut full_script = String::from("#! /bin/sh\n");
+//        full_script.push_str(script.as_str());
+//        Self::InMemory(full_script)
+//    }
 fn test_execute_active() -> Result<(), ApplyError> {
     let always_true = VirtualFile::FsPath(PathBuf::from("/bin/true"));
     let always_false = VirtualFile::FsPath(PathBuf::from("/bin/false"));
@@ -69,7 +74,7 @@ fn test_execute_active() -> Result<(), ApplyError> {
         ),
         _ => return Err(ApplyError::Error(String::from("OK not expected"))),
     }
-    let echo_hello = VirtualFile::in_memory_shell("echo hello".into());
+    let echo_hello = VirtualFile::InMemory("#!/bin/sh\necho hello".into());
     execute_active(
         &echo_hello,
         Args::new(),

@@ -51,9 +51,6 @@ errs: err_no_command err_notset er_invalid_command err_novar err_noval err_t_den
 
 noargs: 
 	$(dryrun) 
-help:
-	$(dryrun) --help
-
 cmd:
 	${dryrun} v mode=600 if Makefile of /tmp/ cp %%if%% %%of%%
 
